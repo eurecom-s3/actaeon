@@ -1,0 +1,185 @@
+--- volatility/plugins/overlays/windows/windows.py	2012-09-12 08:22:08.000000000 +0200
++++ volatility/plugins/overlays/windows/my_windows.py	2013-04-16 15:41:02.979604656 +0200
+@@ -10,11 +10,11 @@
+ # This program is distributed in the hope that it will be useful, but
+ # WITHOUT ANY WARRANTY; without even the implied warranty of
+ # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+-# General Public License for more details. 
++# General Public License for more details.
+ #
+ # You should have received a copy of the GNU General Public License
+ # along with this program; if not, write to the Free Software
+-# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA 
++# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ #
+ 
+ import datetime, struct
+@@ -71,9 +71,9 @@
+     'TimeZoneBias' : [ None, ['WinTimeStamp', {}]],
+     }],
+ 
+-    # The DTB is really an array of 2 ULONG_PTR but we only need the first one 
+-    # which is the value loaded into CR3. The second one, according to procobj.c 
+-    # of the wrk-v1.2, contains the PTE that maps something called hyper space. 
++    # The DTB is really an array of 2 ULONG_PTR but we only need the first one
++    # which is the value loaded into CR3. The second one, according to procobj.c
++    # of the wrk-v1.2, contains the PTE that maps something called hyper space.
+     '_KPROCESS' : [ None, {
+     'DirectoryTableBase' : [ None, ['unsigned long']],
+     }],
+@@ -325,6 +325,7 @@
+         try:
+             process_as = self.obj_vm.__class__(self.obj_vm.base, self.obj_vm.get_config(), dtb = directory_table_base)
+         except AssertionError, _e:
++            debug.debug("Get_process_address_space - PROCESS_AS FAILED!!!")
+             return obj.NoneObject("Unable to get process AS")
+ 
+         process_as.name = "Process {0}".format(self.UniqueProcessId)
+@@ -349,12 +350,12 @@
+     def get_token(self):
+         """Return the process's TOKEN object if its valid"""
+ 
+-        # The dereference checks if the address is valid  
+-        # and returns obj.NoneObject if it fails 
++        # The dereference checks if the address is valid
++        # and returns obj.NoneObject if it fails
+         token = self.Token.dereference_as("_TOKEN")
+ 
+-        # This check fails if the above dereference failed 
+-        # or if any of the _TOKEN specific validity tests failed. 
++        # This check fails if the above dereference failed
++        # or if any of the _TOKEN specific validity tests failed.
+         if token.is_valid():
+             return token
+ 
+@@ -391,16 +392,16 @@
+         return self.Tcb.ApcState.Process.dereference_as("_EPROCESS")
+ 
+ class _HANDLE_TABLE(obj.CType):
+-    """ A class for _HANDLE_TABLE. 
+-    
+-    This used to be a member of _EPROCESS but it was isolated per issue 
+-    91 so that it could be subclassed and used to service other handle 
++    """ A class for _HANDLE_TABLE.
++
++    This used to be a member of _EPROCESS but it was isolated per issue
++    91 so that it could be subclassed and used to service other handle
+     tables, such as the _KDDEBUGGER_DATA64.PspCidTable.
+     """
+ 
+     def get_item(self, entry, handle_value = 0):
+         """Returns the OBJECT_HEADER of the associated handle. The parent
+-        is the _HANDLE_TABLE_ENTRY so that an object can be linked to its 
++        is the _HANDLE_TABLE_ENTRY so that an object can be linked to its
+         GrantedAccess.
+         """
+         return entry.Object.dereference_as("_OBJECT_HEADER", parent = entry, handle_value = handle_value)
+@@ -410,7 +411,7 @@
+         and iterates over them.
+         """
+ 
+-        # The counts below are calculated by taking the size of a page and dividing 
++        # The counts below are calculated by taking the size of a page and dividing
+         # by the size of the data type contained within the page. For more information
+         # see http://blogs.technet.com/b/markrussinovich/archive/2009/09/29/3283844.aspx
+         if level > 0:
+@@ -435,13 +436,13 @@
+                     depth += 1
+                 else:
+ 
+-                    # All handle values are multiples of four, on both x86 and x64. 
++                    # All handle values are multiples of four, on both x86 and x64.
+                     handle_multiplier = 4
+-                    # Calculate the starting handle value for this level. 
++                    # Calculate the starting handle value for this level.
+                     handle_level_base = depth * count * handle_multiplier
+                     # The size of a handle table entry.
+                     handle_entry_size = self.obj_vm.profile.get_obj_size("_HANDLE_TABLE_ENTRY")
+-                    # Finally, compute the handle value for this object. 
++                    # Finally, compute the handle value for this object.
+                     handle_value = ((entry.obj_offset - offset) /
+                                    (handle_entry_size / handle_multiplier)) + handle_level_base
+ 
+@@ -494,7 +495,7 @@
+ 
+     def __init__(self, *args, **kwargs):
+         # Usually we don't add members to objects like this, but its an
+-        # exception due to lack of better options. See Issue #135. 
++        # exception due to lack of better options. See Issue #135.
+         self.HandleValue = kwargs.get("handle_value", 0)
+         obj.CType.__init__(self, *args, **kwargs)
+         # Create accessors for optional headers
+@@ -662,7 +663,7 @@
+     @property
+     def Length(self):
+         """Get the length of the VAD memory region"""
+-        return ((self.EndingVpn + 1) << 12) - self.Start 
++        return ((self.EndingVpn + 1) << 12) - self.Start
+ 
+ class _MMVAD_LONG(_MMVAD_SHORT):
+     """Subclasses _MMVAD_LONG based on _MMVAD_SHORT"""
+@@ -688,7 +689,7 @@
+     """A scanner for KPCR data within an address space"""
+ 
+     def __init__(self, *args, **kwargs):
+-        # Remove the value kwarg since overlaying one 
++        # Remove the value kwarg since overlaying one
+         # on the other would give the value precedence
+         kwargs.pop('value', None)
+         obj.VolatilityMagic.__init__(self, *args, **kwargs)
+@@ -700,16 +701,16 @@
+             yield val
+ 
+ class VolatilityMaxAddress(obj.VolatilityMagic):
+-    """The maximum address of a profile's 
+-    underlying AS. 
++    """The maximum address of a profile's
++    underlying AS.
+ 
+     On x86 this is 0xFFFFFFFF (2 ** 32) - 1
+-    On x64 this is 0xFFFFFFFFFFFFFFFF (2 ** 64) - 1 
++    On x64 this is 0xFFFFFFFFFFFFFFFF (2 ** 64) - 1
+ 
+-    We use a VolatilityMagic to calculate this 
+-    based on the size of an address, since that's 
++    We use a VolatilityMagic to calculate this
++    based on the size of an address, since that's
+     something we can already rely on being set
+-    properly for the AS. 
++    properly for the AS.
+     """
+ 
+     def generate_suggestions(self):
+@@ -738,13 +739,18 @@
+             else:
+                 pde_base = 0xc0300000
+                 pd = self.obj_vm.dtb
+-            if (self.obj_vm.vtop(pde_base) == pd):
+-                yield True
+-                raise StopIteration
+-
++                ept = self.obj_vm.get_config().EPT
++            if ept != None:
++                if (self.obj_vm.vtop(pde_base) == self.obj_vm.gpa2hpa_ept(pd, ept)):
++                    yield True
++                    raise StopIteration
++            else:
++                if self.obj_vm.vtop(pde_base) == pd:
++                    yield True
++                    raise StopIteration
+         except addrspace.ASAssertionError, _e:
+             pass
+-        debug.debug("Failed to pass the Moyix Valid IA32 AS test", 3)
++        debug.debug("Failed to pass the Moyix Valid IA32 AS test")
+ 
+         # This constraint verifies that _KUSER_ SHARED_DATA is shared
+         # between user and kernel address spaces.
+@@ -752,7 +758,7 @@
+             if self.obj_vm.vtop(0xffdf0000) != None:
+                 yield True
+                 raise StopIteration
+-        debug.debug("Failed to pass the labarum_x Valid IA32 AS test", 3)
++        debug.debug("Failed to pass the labarum_x Valid IA32 AS test")
+ 
+         yield False
+ 
