@@ -262,6 +262,47 @@ class GenericVmcsLinkPointerCheck(scan.ScannerCheck):
         return 4096
 
 
+class GenericCr3Check(scan.ScannerCheck):
+    """
+    CR3 generally is 4k aligned.
+    Scan the candidate page to find at least two aligned values.
+    """
+
+    def __init__(self, address_space, **kwargs):
+        scan.ScannerCheck.__init__(self, address_space)
+
+
+    def check(self, offset):
+        global generic_vmcs_cr3
+
+        counter = 0
+        for f in range(0, 4094, 4):
+            try:
+                data = self.address_space.read(offset + f, 0x04)
+            except:
+                continue
+
+            entry = struct.unpack('<I', data)[0]
+
+            if entry == 0x00:
+                continue
+            if (entry % 4096) == 0:
+                counter += 1
+                if offset not in generic_vmcs_cr3:
+                    generic_vmcs_cr3[offset] = []
+                else:
+                    generic_vmcs_cr3[offset].append(entry)
+
+        if counter >= 2:
+            #debug.info("cr3 aligniment property at %08x" % offset)
+            return True
+        return False
+
+
+    def skip(self, data, offset):
+        return 4096
+
+
 class GenericCsSegmentCheck(scan.ScannerCheck):
     """
     Generally there is at least one entry in the VMCS with the CS segment register set at 0x60.
@@ -327,7 +368,8 @@ class GenericVmcsScan(scan.BaseScanner):
     checks = [ ("GenericSecondEntryCheck", {}),
                ("GenericVmcsLinkPointerCheck", {}),
                ("GenericCsSegmentCheck", {}),
-               ("GenericSsSegmentCheck", {})
+               ("GenericSsSegmentCheck", {}),
+               ("GenericCr3Check", {})
                ]
 
 
