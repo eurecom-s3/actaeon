@@ -11,11 +11,11 @@
 # This program is distributed in the hope that it will be useful, but
 # WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-# General Public License for more details. 
+# General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA 
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #
 
 
@@ -54,7 +54,7 @@ processor_based_execution_controls = {
 
 
 # Table 21-7. Definitions of Secondary Processor Based VM Execution Controls.
-secondary_exec_controls = { 
+secondary_exec_controls = {
 0 : "Virtualize APIC accesses",
 1 : "EPT Enabled",
 2 : "Descriptor Table exiting",
@@ -67,7 +67,7 @@ secondary_exec_controls = {
 }
 
 
-exception_bitmap_bits = { 
+exception_bitmap_bits = {
 0  : "TRAP_DIVIDE_ERROR",
 1  : "TRAP_DEBUG",
 2  :  "TRAP_NMI",
@@ -91,6 +91,17 @@ exception_bitmap_bits = {
 31 : "TRAP_DEFERRED_NMI"
 }
 
+vmexits_control = {
+    2: "Save debug controls",
+    9: "Host address-space size",
+    12: "Load IA32_PERF_GLOB AL_CTRL",
+    15: "Acknowledge interrupt on exit",
+    18: "Save IA32_PAT",
+    19: "Load IA32_PAT",
+    20: "Save IA32_EFER",
+    21: "Load IA32_EFER",
+    22: "Save VMX-preemption timer value"
+}
 
 vmexits = { 
 0 : "Exception or non-maskable interrupt",
@@ -257,6 +268,7 @@ vmcs_field_size = {
 "GUEST_RFLAGS" : 64,
 "GUEST_SYSENTER_ESP" : 64,
 "GUEST_SYSENTER_EIP" : 64,
+"GUEST_IA32_EFER_FULL" : 64,
 "HOST_CR0" : 64,
 "HOST_CR3" : 64,
 "HOST_CR4" : 64,
@@ -267,6 +279,7 @@ vmcs_field_size = {
 "HOST_IDTR_BASE" : 64,
 "HOST_IA32_SYSENTER_ESP" : 64,
 "HOST_IA32_SYSENTER_EIP" : 64,
+"HOST_IA32_EFER_FULL" : 64,
 "HOST_IA32_SYSENTER_CS" : 32,
 "GUEST_RSP" : 64,
 "GUEST_RIP" : 64,

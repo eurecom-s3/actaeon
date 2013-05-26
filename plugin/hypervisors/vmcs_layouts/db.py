@@ -22,9 +22,15 @@
 
 revision_id_db = {
     0x0d : "PENRYN",
-    0x10 : "SANDY"
+    0x10 : "SANDY",
+    0x0f : "WESTMERE"
 }
 
+microarch_db = {
+    "penryn" : 0x0d,
+    "sandy" : 0x10,
+    "westmere" : 0x0f
+}
 
 nested_revision_id_db = {
     0x11e57ed0 : "KVM",
