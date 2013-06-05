@@ -840,6 +840,27 @@ class Hyperls(commands.Command):
                 outfd.write("\t\t|_ %s\n" % v)
 
 
+    def merge_guest_vmcs(self, outfd):
+        global vmcs_offset
+        guests = {}
+        outfd.write("\n:: Counting guests number in the dump...\n")
+        for vmcs in hyper.vmcs_found:
+            debug.info("Vmcs Address = %x offset %x size %x" % (vmcs, vmcs_offset["APIC_ACCESS_ADDR"]*4, layouts.vmcs.vmcs_field_size["APIC_ACCESS_ADDR"]/8))
+            apic_addr = self.get_vmcs_field(vmcs, vmcs_offset["APIC_ACCESS_ADDR"]*4, layouts.vmcs.vmcs_field_size["APIC_ACCESS_ADDR"]/8)
+            debug.info("apic_addr %x" % apic_addr)
+            if apic_addr in guests:
+                guests[apic_addr].append(vmcs)
+            else:
+                guests[apic_addr] = [vmcs]
+        outfd.write("\t| There are %d guests: \n" % len(guests))
+        i = 0
+        for guest, vmcs_list in guests.items():                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+            outfd.write("\t\t| Guest %d has used %d core:\n" % (i, len(vmcs_list)))
+            i += 1
+            for vmcs in vmcs_list:
+                outfd.write("\t\t\t| VMCS address: {0:#0{1}x}\n".format(vmcs, 18))
+
+
     def count_hypervisors(self, outfd):
          global vmcs12
 
@@ -959,8 +980,8 @@ class Hyperls(commands.Command):
                 for nest in set(hyper.nvmcs_found):
                     outfd.write("\t|_ Nested VMCS at 0x%08x\n" % nest)
                 self.hierarchy_check(outfd)
-
             self.count_hypervisors(outfd)
+            self.merge_guest_vmcs(outfd)
 
 
 
