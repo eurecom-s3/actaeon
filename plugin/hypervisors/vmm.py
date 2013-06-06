@@ -845,15 +845,15 @@ class Hyperls(commands.Command):
         guests = {}
         outfd.write("\n:: Counting guests number in the dump...\n")
         for vmcs in hyper.vmcs_found:
-            debug.info("Vmcs Address = %x offset %x size %x" % (vmcs, vmcs_offset["APIC_ACCESS_ADDR"]*4, layouts.vmcs.vmcs_field_size["APIC_ACCESS_ADDR"]/8))
+#            debug.info("Vmcs Address = %x offset %x size %x" % (vmcs, vmcs_offset["APIC_ACCESS_ADDR"]*4, layouts.vmcs.vmcs_field_size["APIC_ACCESS_ADDR"]/8))
             apic_addr = self.get_vmcs_field(vmcs, vmcs_offset["APIC_ACCESS_ADDR"]*4, layouts.vmcs.vmcs_field_size["APIC_ACCESS_ADDR"]/8)
-            debug.info("apic_addr %x" % apic_addr)
+#            debug.info("apic_addr %x" % apic_addr)
             if apic_addr in guests:
                 guests[apic_addr].append(vmcs)
             else:
                 guests[apic_addr] = [vmcs]
         outfd.write("\t| There are %d guests: \n" % len(guests))
-        i = 0
+        i = 1
         for guest, vmcs_list in guests.items():                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
             outfd.write("\t\t| Guest %d has used %d core:\n" % (i, len(vmcs_list)))
             i += 1
@@ -968,13 +968,13 @@ class Hyperls(commands.Command):
                                 if k == "SECONDARY_VM_EXEC_CONTROL" and hyper.use_secondary_control == 1:
                                     self.parsing_secondary_vm_exec_control(outfd, self.get_vmcs_field(address,
                                     off, size), address)
-
                         if hyper.iobitmaps == 1:
                             outfd.write("\t|_ Zoom on IO_BITMAPS:\n")
                             self.parse_iobitmaps(outfd)
                         self.check_clts_exit(outfd, address)
                         self.check_rdmsr(outfd, address)
                         self.check_wrmsr(outfd, address)
+                        outfd.write("\t==========================\n")
             if self._config.NESTED:
                 outfd.write("\n:: Looking for VMCS1N...\n")
                 for nest in set(hyper.nvmcs_found):
