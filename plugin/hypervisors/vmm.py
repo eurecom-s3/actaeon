@@ -405,8 +405,11 @@ class Hyperls(commands.Command):
         return False
 
     # Check if the host is in PAE mode
-    def isHostPAE(self, offset, phy_space):
-        off = vmcs_offset["HOST_CR4"] * 4
+    def isPAE(self, offset, phy_space, ishost):
+        if ishost:
+            off = vmcs_offset["HOST_CR4"] * 4
+        else:
+            off = vmcs_offset["GUEST_CR4"] * 4
         data = phy_space.read(offset + off, 0x04)
         cr4 = struct.unpack('<I', data)[0]
         mask = 0x20
@@ -415,12 +418,15 @@ class Hyperls(commands.Command):
         return False
 
     #Check if the host is in IA32E mode, in this case we have 64 bit address space
-    def isHostIA32E(self, offset, phy_space):
+    def isIA32E(self, offset, phy_space, ishost):
         debug.debug("checking host VM_EXIT_CONTROLS")
-        off = vmcs_offset["VM_EXIT_CONTROLS"] * 4
+        if ishost:
+            off = vmcs_offset["VM_EXIT_CONTROLS"] * 4
+        else:
+            off = vmcs_offset["VM_ENTRY_CONTROLS"] * 4
         data = phy_space.read(offset + off, 0x04)
         vmx_exit_control = struct.unpack('<I', data)[0]
-        mask_host_address_space_size = 0x200
+        mask_host_address_space_size = 0x200           # Checking host address space size -> bit 10
         if ((vmx_exit_control & mask_host_address_space_size) >> 9) == 1:
             return True
         return False
@@ -470,8 +476,9 @@ class Hyperls(commands.Command):
                                     for pt_entry in range(0, 4096, 8):
                                             pte_raw = phy_space.read(pde_addr + pt_entry, 0x08)
                                             pte = struct.unpack("<Q", pte_raw)[0]
-                                            if (pte & mask_4KB) == (page & mask_4KB):
-                                                return True
+                                            if self.isPagePresent(pte):
+                                                if (pte & mask_4KB) == (page & mask_4KB):
+                                                    return True
         return False
 
     def page_dir_validation32PAE(self, page, phy_space):
@@ -660,7 +667,7 @@ class Hyperls(commands.Command):
         if self._config.GENERIC == False:
             for offset in VmcsScan().scan(phy_space):
                 debug.debug(">> Possible VMCS at 0x%16x" % offset)
-                if not self.isHostPAE(offset, phy_space):
+                if not self.isPAE(offset, phy_space, True):
                     # 32 bit paging 
                     if self.page_dir_validation32(offset, phy_space):
                         debug.debug("[32 bit] VMCS 0x%08x has been validated" % offset)
@@ -668,7 +675,7 @@ class Hyperls(commands.Command):
                         yield offset
                     else:
                         debug.debug("[32 bit] VMCS 0x%08x has not been validated" % offset)
-                elif not self.isHostIA32E(offset, phy_space):
+                elif not self.isIA32E(offset, phy_space, True):
                     # 32 bit PAE paging
                     if self.page_dir_validation32PAE(offset, phy_space):
                         debug.debug("[32 bit PAE] VMCS 0x%16x has been validated" % offset)
@@ -676,7 +683,7 @@ class Hyperls(commands.Command):
                         yield offset
                     else:
                         debug.debug("[32 bit PAE] VMCS 0x%16x has not been validate" % offset)
-                elif self.isHostIA32E(offset, phy_space) and self.isHostPAE(offset, phy_space):
+                elif self.isIA32E(offset, phy_space, True) and self.isPAE(offset, phy_space, True):
                     # IA32E paging
                     if self.page_dir_validation64(offset, phy_space):
                         debug.debug("[64 bit] VMCS 0x%16x has been validated" % offset)
@@ -839,15 +846,154 @@ class Hyperls(commands.Command):
             if ((word >> k) & 0x01) == 1:
                 outfd.write("\t\t|_ %s\n" % v)
 
+    def eptPageAccessAllowed(self, page):
+        mask = 0x07
+        mask_4KB = 0x000FFFFFFFFFF000
+        if (page & mask) > 0x00 and (page & mask_4KB) > 0x00:
+            return True
+        else:
+            return False
 
-    def merge_guest_vmcs(self, outfd):
-        global vmcs_offset
+    def walkEPTtoCountGuests(self, vmcs_list):
+        global memory
+
         guests = {}
-        outfd.write("\n:: Counting guests number in the dump...\n")
-        for vmcs in hyper.vmcs_found:
-#            debug.info("Vmcs Address = %x offset %x size %x" % (vmcs, vmcs_offset["APIC_ACCESS_ADDR"]*4, layouts.vmcs.vmcs_field_size["APIC_ACCESS_ADDR"]/8))
+        physical_pages = {}
+
+        debug.info("Walking EPT")
+        for vmcs in vmcs_list:
+            eptp = self.get_vmcs_field(vmcs, vmcs_offset["EPT_POINTER"]*4, layouts.vmcs.vmcs_field_size["EPT_POINTER"]/8)
+#            debug.info("VMCS: 0x%x EPT: 0x%x physical_pages len = %d len VMCS list %d" % (vmcs, eptp, len(physical_pages), len(vmcs_list)))
+            mask_eptp = 0x000FFFFFFFFFF000
+            mask_1GB = 0x000FFFFFC0000000
+            mask_2MB = 0x000FFFFFFFE00000
+            mask_4KB = 0x000FFFFFFFFFF000
+            eptp = eptp & mask_eptp  # Alignment to 4KB
+            found = False
+            #PML4
+            for pml4_entry in range(0, 4096, 8):
+                if found:
+                    break
+                pml4e_raw = memory.read(eptp + pml4_entry, 8)
+                pml4e = struct.unpack("<Q", pml4e_raw)[0]
+                pml4e_addr = pml4e & mask_4KB
+                if self.eptPageAccessAllowed(pml4e) and memory.is_valid_address(pml4e_addr):
+                    #PDPT
+                    for pdpt_entry in range(0, 4096, 8):
+                        if found:
+                            break
+                        pdpte_raw = memory.read(pml4e_addr + pdpt_entry, 8)
+                        pdpte = struct.unpack("<Q", pdpte_raw)[0]
+                        pdpte_addr = pdpte & mask_4KB
+                        if self.eptPageAccessAllowed(pdpte) and memory.is_valid_address(pdpte_addr):
+                            if self.isExtendedPaging(pdpte):
+                                pdpte_addr = pdpte_addr & mask_1GB
+                                if pdpte_addr in physical_pages:
+                                    if not vmcs in guests[physical_pages[pde_addr]]:
+                                        guests[physical_pages[pdpte_addr]].append(vmcs)
+                                        found = True
+#                                        debug.info("Match 1GB VMCS 0x%x with physical 0x%x to GUEST 0x%x" % (vmcs, pdpte_addr, physical_pages[pdpte_addr]))
+                                else:
+                                    physical_pages[pdpte_addr] = vmcs
+                                    if not vmcs in guests:
+                                        guests[vmcs] = [vmcs]
+#                                    debug.info("Added 1GB VMCS 0x%x with physical 0x%x to GUEST 0x%x" % (vmcs, pdpte_addr, physical_pages[pdpte_addr]))
+                            elif not found:
+                                #PD
+                                for pd_entry in range(0, 4096, 8):
+                                    if found:
+                                        break
+                                    pde_raw = memory.read(pdpte_addr + pd_entry, 0x08)
+                                    pde = struct.unpack("<Q", pde_raw)[0]
+                                    pde_addr = pde & mask_4KB
+                                    if self.eptPageAccessAllowed(pde) and memory.is_valid_address(pde_addr):
+                                        if self.isExtendedPaging(pde):
+                                            pde_addr = pde & mask_2MB
+                                            if pde_addr in physical_pages:
+                                                if not vmcs in guests[physical_pages[pde_addr]]:
+                                                    guests[physical_pages[pde_addr]].append(vmcs)
+                                                    found = True
+#                                                    debug.info("Match 2MB VMCS 0x%x with physical 0x%x to GUEST 0x%x" % (vmcs, pde_addr, physical_pages[pde_addr]))
+
+                                            else:
+                                                physical_pages[pde_addr] = vmcs
+                                                if not vmcs in guests:
+                                                    guests[vmcs] = [vmcs]
+#                                                debug.info("Added 2MB VMCS 0x%x with physical 0x%x to GUEST 0x%x" % (vmcs, pde_addr, physical_pages[pde_addr]))
+                                        elif not found:
+                                            #PT
+                                            for pt_entry in range(0, 4096, 8):
+                                                    if found:
+                                                        break
+                                                    pte_raw = memory.read(pde_addr + pt_entry, 0x08)
+                                                    pte = struct.unpack("<Q", pte_raw)[0]
+                                                    pte_addr = pte & mask_4KB
+                                                    if self.eptPageAccessAllowed(pte) and memory.is_valid_address(pte_addr):
+                                                        if pte_addr in physical_pages:
+                                                            if not vmcs in guests[physical_pages[pte_addr]]:
+                                                                guests[physical_pages[pte_addr]].append(vmcs)
+                                                                found = True
+#                                                                debug.info("Match 4KB VMCS 0x%x with physical 0x%x to GUEST 0x%x" % (vmcs, pte_addr, physical_pages[pte_addr]))
+
+                                                        else:
+                                                            physical_pages[pte_addr] = vmcs
+                                                            if not vmcs in guests:
+                                                                guests[vmcs] = [vmcs]
+#                                                            debug.info("Added 4KB VMCS 0x%x with physical 0x%x to GUEST 0x%x" % (vmcs, pte_addr, physical_pages[pte_addr]))
+        return guests
+
+    def guestPhAddrToPhAddr(self, eptp, address):
+        global memory
+
+        mask_eptp = 0x000FFFFFFFFFF000
+        mask_1GB = 0x000FFFFFC0000000
+        mask_2MB = 0x000FFFFFFFE00000
+        mask_4KB = 0x000FFFFFFFFFF000
+        mask_pml4e = 0x0000FF8000000000
+        mask_pdpte = 0x0000007FC0000000
+        mask_pde = 0x000000003FE00000
+        mask_pte = 0x0000000001FF000
+
+        debug.info("EPTP = 0x%x address 0x%x" % (eptp, address))
+        pml4e_addr = (eptp & mask_eptp) + (address & mask_pml4e)
+        pml4e_raw = memory.read(pml4e_addr, 0x08)
+        pml4e = struct.unpack("<Q", pml4e_raw)[0]
+        debug.info("pml4e_addr = 0x%x PML4E = 0x%x" % (pml4e_addr, pml4e))
+        pdpte_addr = (pml4e & mask_4KB) + (address & mask_pdpte)
+        pdpte_raw = memory.read(pdpte_addr, 0x08)
+        pdpte = struct.unpack("<Q", pdpte_raw)[0]
+        debug.info("pdpte_addr = 0x%x pdpte = 0x%x" % (pdpte_addr, pdpte))
+        if (self.isExtendedPaging(pdpte)):
+            #1GB page
+            entry_addr = (pdpte & mask_1GB) + (address & 0x03FFFFFFF)
+            debug.info("1GB page entry_addr = 0x%x" % entry_addr)
+        else:
+            #EPT-PDE
+            pde_addr = (pdpte & mask_4KB) + (address & mask_pde)
+            pde_raw = memory.read(pde_addr, 0x08)
+            pde = struct.unpack("<Q", pde_raw)[0]
+            debug.info("pde_addr = 0x%x pde = 0x%x" % (pde_addr, pde))
+            if (self.isExtendedPaging(pde)):
+                #2MB page
+                entry_addr = (pde & mask_2MB) + (address & 0x01FFFFF)
+                debug.info("2MB page entry_addr = 0x%x" %entry_addr)
+            else:
+                #EPT-PTE
+                pte_addr = (pde & mask_4KB) + (address & mask_pte)
+                pte_raw = memory.read(pte_addr, 0x08)
+                pte = struct.unpack("<Q", pte_raw)[0]
+                debug.info("pte_addr = 0x%x pte = 0x%x" % (pte_addr, pte))
+                entry_addr = (pte & mask_4KB) + (address & 0x0FFF)
+                debug.info("4KB page entry_addr = 0x%x" %entry_addr)
+        return entry_addr
+
+
+    def useAPICtoCountGuests(self, vmcs_list):
+        guests = {}
+        for vmcs in vmcs_list:
             apic_addr = self.get_vmcs_field(vmcs, vmcs_offset["APIC_ACCESS_ADDR"]*4, layouts.vmcs.vmcs_field_size["APIC_ACCESS_ADDR"]/8)
-#            debug.info("apic_addr %x" % apic_addr)
+            debug.info("apic_addr 0x%x" % apic_addr)
+
             if apic_addr in guests:
                 guests[apic_addr].append(vmcs)
             else:
@@ -860,33 +1006,51 @@ class Hyperls(commands.Command):
             for vmcs in vmcs_list:
                 outfd.write("\t\t\t| VMCS address: {0:#0{1}x}\n".format(vmcs, 18))
 
+        return guests
+
+
+    def countGuests(self, outfd):
+        global vmcs_offset, memory
+        outfd.write("\n:: Counting guests in dump...\n")
+        if "EPT_POINTER" in vmcs_offset:
+            guests = self.walkEPTtoCountGuests(hyper.vmcs_found)
+        else:
+            outfd.write("Not EPT support. Using APIC to count guests\n")
+            guests = self.useAPICtoCountGuests(hyper.vmcs_found)
+        i = 1
+        for guest, vmcs_list in guests.items():
+            if guest == 0x00 and not "EPT_POINTER" in vmcs_offset:
+                outfd.write("\t\tSome Guests did not use APIC. Not possible to count guests for:\n")
+            else:
+                outfd.write("\t\t|_ Guest %d used %d core:\n" % (i, len(vmcs_list)))
+                i += 1
+            for vmcs in vmcs_list:
+                outfd.write("\t\t\t|_ VMCS address: {0:#0{1}x}\n".format(vmcs, 18))
 
     def count_hypervisors(self, outfd):
-         global vmcs12
+        global vmcs12
 
-         outfd.write("\n:: Counting the hypervisors in the dump...\n")
-         rip = {}
-         for v in set(hyper.vmcs_found):
-             size = layouts.vmcs.vmcs_field_size["HOST_RIP"] / 8
-             ip = self.get_vmcs_field(v, vmcs_offset["HOST_RIP"]*4, size)
-             if ip not in rip:
-                 rip[ip] = 0
-             else:
-                 rip[ip] += 1
-
-         for v in set(hyper.nvmcs_found):
-             size = layouts.vmcs.vmcs_field_size["HOST_RIP"] / 8
-             ip = self.get_vmcs_field(v, vmcs12["HOST_RIP"]*4, size)
-             if ip not in rip:
-                 rip[ip] = 0
-             else:
-                 rip[ip] += 1
-
-         list_rip = rip.keys()
-         outfd.write("\t| There are %d hypervisors: " % len(list_rip))
-         for i in list_rip:
-             outfd.write(" 0x%08x " % i)
-         outfd.write("\n")
+        outfd.write("\n:: Counting the hypervisors in the dump...\n")
+        rip = {}
+        for v in set(hyper.vmcs_found):
+            size = layouts.vmcs.vmcs_field_size["HOST_RIP"] / 8
+            ip = self.get_vmcs_field(v, vmcs_offset["HOST_RIP"]*4, size)
+            if ip not in rip:
+                rip[ip] = 0
+            else:
+                rip[ip] += 1
+        for v in set(hyper.nvmcs_found):
+            size = layouts.vmcs.vmcs_field_size["HOST_RIP"] / 8
+            ip = self.get_vmcs_field(v, vmcs12["HOST_RIP"]*4, size)
+            if ip not in rip:
+                rip[ip] = 0
+            else:
+                rip[ip] += 1
+        list_rip = rip.keys()
+        outfd.write("\t| There are %d hypervisors: " % len(list_rip))
+        for i in list_rip:
+            outfd.write(" 0x%08x " % i)
+        outfd.write("\n")
 
 
     '''
@@ -981,7 +1145,7 @@ class Hyperls(commands.Command):
                     outfd.write("\t|_ Nested VMCS at 0x%08x\n" % nest)
                 self.hierarchy_check(outfd)
             self.count_hypervisors(outfd)
-            self.merge_guest_vmcs(outfd)
+            self.countGuests(outfd)
 
 
 
