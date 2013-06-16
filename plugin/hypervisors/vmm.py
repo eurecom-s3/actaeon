@@ -20,8 +20,7 @@ hypervisor_pages = {}
 generic_vmcs_cr3 = {}
 memory = None
 vmcs12 = None
-
-
+revision_id = None
 
 class RevisionIdCheck(scan.ScannerCheck):
     """
@@ -34,10 +33,11 @@ class RevisionIdCheck(scan.ScannerCheck):
 
 
     def check(self, offset):
+        global revision_id
         data = self.address_space.read(offset, 0x04)
         entry = struct.unpack('<I', data)[0]
 
-        if entry in layouts.db.revision_id_db.keys():
+        if entry == revision_id:
             return True
         else:
             return False
@@ -77,106 +77,46 @@ class VmcsLinkPointerCheck(scan.ScannerCheck):
     def __init__(self, address_space, **kwargs):
         scan.ScannerCheck.__init__(self, address_space)
 
-
     def check(self, offset):
         global vmcs_offset
-        
         off = vmcs_offset["VMCS_LINK_POINTER"] * 4
         data = self.address_space.read(offset + off, 0x04)
         vmcs_link_pointer = struct.unpack('<I', data)[0]
         data2 = self.address_space.read(offset + off + 0x04, 0x04)
         vmcs_link_pointer2 = struct.unpack('<I', data2)[0]
-
         if (vmcs_link_pointer == 0xffffffff and vmcs_link_pointer2 == 0xffffffff):
+            #debug.info("Link Pointer check [OK]")
             return True
-        else:
-            return False
-
+        return False
 
     def skip(self, data, offset):
         return 4096
 
 
-
-class GuestCr3Check(scan.ScannerCheck):
+class VMXEnableCheck(scan.ScannerCheck):
     """
-    VMCS Guest Cr3 check
-    Guest Cr3 should be 4k aligned.
+    VMCS VMX enabled check
+    CR4.VMX bit 13.
     """
-
     def __init__(self, address_space, **kwargs):
         scan.ScannerCheck.__init__(self, address_space)
 
-
     def check(self, offset):
         global vmcs_offset
-        
-        size = layouts.vmcs.vmcs_field_size["GUEST_CR3"] / 8
-        data = self.address_space.read(offset + (vmcs_offset["GUEST_CR3"] * 4), size)
-        
-        if size == 8:
-            entry = struct.unpack('<Q', data)[0]
-        elif size == 4:
-            entry = struct.unpack('<I', data)[0]
-        elif size == 2:
-            entry = struct.unpack('<H', data)[0]
-        else:
-            debug.error("Size not allowed.")
-
-        if entry == 0x00: return False
-        
-        if (entry % 4096) == 0:
+        off = vmcs_offset["HOST_CR4"] * 4
+        data = self.address_space.read(offset+off, 0x04)
+        cr4 = struct.unpack("<I", data)[0]
+        mask = 0x2000
+        if (cr4 & mask):
+            #debug.info("VMX enable check cr4=%08x [OK]" % cr4)
             return True
         else:
             return False
-
 
     def skip(self, data, offset):
         return 4096
 
 
-
-class HostCr3Check(scan.ScannerCheck):
-    """
-    VMCS Host Cr3 check
-    Host Cr3 should be 4k or 32bit aligned.
-    """
-
-    def __init__(self, address_space, **kwargs):
-        scan.ScannerCheck.__init__(self, address_space)
-
-
-    def check(self, offset):
-        global vmcs_offset
-
-        size = layouts.vmcs.vmcs_field_size["HOST_CR3"] / 8
-        data = self.address_space.read(offset + (vmcs_offset["HOST_CR3"] * 4), size)
-        
-        if size == 8:
-            entry = struct.unpack('<Q', data)[0]
-        elif size == 4:
-            entry = struct.unpack('<I', data)[0]
-        elif size == 2:
-            entry = struct.unpack('<H', data)[0]
-        else:
-            debug.error("Size not allowed.")
-
-        if entry == 0x00: return False
-
-        if (entry % 4096) == 0:
-            return True
-        else:
-            if (entry % 32) == 0:
-                var = self.address_space.read(offset, 0x04)
-                rev_id = struct.unpack('<I', var)[0]
-                if (rev_id in layouts.db.revision_id_db.keys() or
-                rev_id in layouts.db.nested_revision_id_db.keys()):
-                    return True
-            return False
-
-
-    def skip(self, data, offset):
-        return 4096
 
 
 
@@ -187,11 +127,10 @@ class VmcsScan(scan.BaseScanner):
     """
 
     checks = [ ("RevisionIdCheck", {}),
-    	       ("SecondEntryCheck", {}),
-               ("VmcsLinkPointerCheck", {}),
-               ("GuestCr3Check", {}),
-               ("HostCr3Check", {})
-             ]
+               ("SecondEntryCheck", {}),
+               ("VMXEnableCheck", {}),
+               ("VmcsLinkPointerCheck", {})
+               ]
 
 
 
@@ -204,9 +143,8 @@ class NestedScan(scan.BaseScanner):
 
     checks = [ ("NestedRevisionIdCheck", {}),
                ("SecondEntryCheck", {}),
-               ("VmcsLinkPointerCheck", {}),
-               ("GuestCr3Check", {}),
-               ("HostCr3Check", {})
+               ("VMXEnableCheck", {}),
+               ("VmcsLinkPointerCheck", {})
                ]
 
 
@@ -294,7 +232,7 @@ class GenericVmcsLinkPointerCheck(scan.ScannerCheck):
 
     def check(self, offset):
         counter = 0
-        for f in range(0, 4094, 4):
+        for f in range(4, 4094, 4):
             try:
                 data = self.address_space.read(offset + f, 0x04)
             except:
@@ -322,7 +260,6 @@ class GenericVmcsLinkPointerCheck(scan.ScannerCheck):
 
     def skip(self, data, offset):
         return 4096
-
 
 
 class GenericCr3Check(scan.ScannerCheck):
@@ -448,22 +385,21 @@ class Hyperls(commands.Command):
         #common.AbstractWindowsCommand.__init__(self, config, *args, **kwargs)
         commands.Command.__init__(self, config, *args, **kwargs)
         self._config.add_option('ARCH', short_option = 'm', default = None,
-                           help = 'Intel Microarchitecture (penryn or sandy',
-                           action = 'store', type = 'str')
+            help = 'Intel Microarchitecture (penryn, sandy or westmere)',
+            action = 'store', type = 'str')
         self._config.add_option('VERBOSE', short_option = 'v', default = False,
-                    action = 'store_true', help = 'Verbose output (print VMCS structure)')
+            action = 'store_true', help = 'Verbose output (print VMCS structure)')
         self._config.add_option('GENERIC', short_option = 'G', default = False,
-                    action = 'store_true', help = 'Use generic heuristics to detect the VMCS')
+            action = 'store_true', help = 'Use generic heuristics to detect the VMCS')
         self._config.add_option('NESTED', short_option = 'N', default = False,
-                    action = 'store_true', help = 'Check for nested virtualization')
+            action = 'store_true', help = 'Check for nested virtualization')
 
-
+    # Check Present flag
     def isPagePresent(self, va):
         mask = 0x01
         if (va & mask) == 1:
             return True
         return False
-
 
     # Check Page Directory Entry PS flag
     def isExtendedPaging(self, va):
@@ -472,167 +408,163 @@ class Hyperls(commands.Command):
             return True
         return False
 
-
-    def isPAE(self, cr4):
+    # Check if the host is in PAE mode
+    def isHostPAE(self, offset, phy_space):
+        off = vmcs_offset["HOST_CR4"] * 4
+        data = phy_space.read(offset + off, 0x04)
+        cr4 = struct.unpack('<I', data)[0]
         mask = 0x20
         if ((cr4 & mask) >> 5) == 1:
-            hyper.pae = 1
+            return True
+        return False
 
+    #Check if the host is in IA32E mode, in this case we have 64 bit address space
+    def isHostIA32E(self, offset, phy_space):
+        if "HOST_IA32_EFER_FULL" in vmcs_offset:
+            off = vmcs_offset["HOST_IA32_EFER_FULL"] * 4
+            data = phy_space.read(offset + off, 0x04)
+            ia32_efer = struct.unpack("<I", data)[0]
+            #debug.info("HOST_IA32_EFER %08x" % ia32_efer)
+            mask = 0x0500
+            if (ia32_efer & mask) == mask:
+                return True
+            return False
+        else:
+            debug.info("checking host VM_EXIT_CONTROLS")
+            off = vmcs_offset["VM_EXIT_CONTROLS"] * 4
+            data = phy_space.read(offset + off, 0x04)
+            vmx_exit_control = struct.unpack('<I', data)[0]
+            #debug.info("vmx_exit_control = %08x " % vmx_exit_control)
+            mask_host_address_space_size = 0x200
+            if ((vmx_exit_control & mask_host_address_space_size) >> 9) == 1:
+                return True
+            return False
 
     '''
     Pagediralgo - 64 bits - (16 (sign extension) - 9 - 9 - 9 - 9 - 12)
     '''
     def page_dir_validation64(self, page, phy_space):
-        global hypervisor_pages, vmcs_offset
-
-        cr3_raw = phy_space.read(page + (vmcs_offset["HOST_CR3"]*4), 8)
+        global vmcs_offset
+        debug.info("Validation IA-32e")
+        cr3_raw = phy_space.read(page + (vmcs_offset["HOST_CR3"]*4), 0x08)
         cr3 = struct.unpack('<Q', cr3_raw)[0]
-        mask = 0xfffff000
-        reg = cr3 & mask
-        found = 0
-        
+        mask_cr3 = 0x000FFFFFFFFFF000
+        mask_1GB = 0x000FFFFFC0000000
+        mask_2MB = 0x000FFFFFFFE00000
+        mask_4KB = 0x000FFFFFFFFFF000
+#        debug.info("cr3 pre mask = %16x" % cr3)
+        cr3 = cr3 & mask_cr3  # Alignment to 4KB
+
         #PML4
-        for entry in range(0, 4096, 8):
-            try:
-                raw = phy_space.read(reg + entry, 0x08) # era 8
-                #print "%d" % len(raw)
-                pt_raw = struct.unpack('<Q', raw)[0] #era Q
-            except Exception, e:
-                #print "%s" % e
-                continue
-
-            #extended_page = isExtendedPaging(pt_raw)
-            page_present = self.isPagePresent(pt_raw)
-            # page is not present
-            if not page_present: continue
-            pt = pt_raw & mask
-
-            # PDPT
-            for off in range(0, 4096, 8):
-                try:
-                    raw = phy_space.read(pt + off, 0x08)
-                    pp_raw = struct.unpack('<Q', raw)[0]
-                except:
-                    continue
-
-                # the page is not present
-                if not self.isPagePresent(pp_raw): continue
-
-                # check if it is extended - TODO
-                pp = pp_raw & mask
-
-                # PD
-                for of in range(0, 4096, 8):
-                    try:
-                        raw = phy_space.read(pp + of, 0x08)
-                        p_raw = struct.unpack('<Q', raw)[0]
-                    except:
-                        continue
-
-                    if not self.isPagePresent(p_raw): continue
-                    p = p_raw & mask
-
-                    # PT
-                    for o in range(0, 4096, 8):
-                        try:
-                            raw = phy_space.read(p + o, 0x08)
-                            fu_raw = struct.unpack('<Q', raw)[0]
-                        except:
-                            continue
-
-
-                        if not self.isPagePresent(fu_raw): continue
-                        fu = fu_raw & mask
-
-                        '''
-                        Dictionary containing all the pages related to the
-                        hypervisor.
-                        '''
-                        if page not in hypervisor_pages:
-                            hypervisor_pages[page] = []
-                            hypervisor_pages[page].append(fu)
+        for pml4_entry in range(0, 4096, 8):
+            pml4e_raw = phy_space.read(cr3 + pml4_entry, 8)
+            pml4e = struct.unpack("<Q", pml4e_raw)[0]
+            pml4e_addr = pml4e & mask_4KB
+            if self.isPagePresent(pml4e) and phy_space.is_valid_address(pml4e_addr):
+                #PDPT
+#                debug.info("pml4e_addr = %16x" % pml4e)
+                for pdpt_entry in range(0, 4096, 8):
+                    pdpte_raw = phy_space.read(pml4e_addr + pdpt_entry, 8)
+                    pdpte = struct.unpack("<Q", pdpte_raw)[0]
+                    pdpte_addr = pdpte & mask_4KB
+                    if self.isPagePresent(pdpte) and phy_space.is_valid_address(pdpte_addr):
+                        if self.isExtendedPaging(pdpte):
+                            if (pdpte & mask_1GB) == (page & mask_1GB):
+                                return True
                         else:
-                            hypervisor_pages[page].append(fu)
-
-                        # PHY
-                        if fu == page:
-                            found = 1
-
-        if found == 1:
-            return True
+                            #PD
+                            for pd_entry in range(0, 4096, 8):
+                                pde_raw = phy_space.read(pdpte_addr + pd_entry, 0x08)
+                                pde = struct.unpack("<Q", pde_raw)[0]
+                                pde_addr = pde & mask_4KB
+                                if self.isPagePresent(pde) and phy_space.is_valid_address(pde_addr):
+                                    if self.isExtendedPaging(pde):
+                                        if (pde & mask_2MB) == (page & mask_2MB):
+                                            return True
+                                    else:
+#                                        debug.info("pde = %16x" % pde)
+                                        #PT
+                                        for pt_entry in range(0, 4096, 8):
+                                                pte_raw = phy_space.read(pde_addr + pt_entry, 0x08)
+                                                pte = struct.unpack("<Q", pte_raw)[0]
+                                                if (pte & mask_4KB) == (page & mask_4KB):
+                                                    return True
         return False
 
+    def page_dir_validation32PAE(self, page, phy_space):
+        global vmcs_offset
+        
+        mask_cr3 = 0xFFFFFFE0
+        mask_2MB = 0x000FFFFFFFE00000
+        mask_4KB = 0x000FFFFFFFFFF000
 
+        debug.info("Validation PAE paging")
+        cr3_raw = phy_space.read(page + vmcs_offset["HOST_CR3"] * 4, 4)
+        cr3 = struct.unpack("<I", cr3_raw)[0]
+        cr3 = cr3 & mask_cr3
 
-    def page_dir_validation32(self, page, phy_space, cr3):
+#        debug.info("Looking for page %08x in the CR3 address space %08x" % (page, cr3))
+        #PDPTEs are 4 x 64 bit
+        for entry in range(0, 32, 8):
+            pdpte_raw = phy_space.read(cr3+entry, 0x08)
+            pdpte = struct.unpack("<Q", pdpte_raw)[0]
+            pdpte_addr = pdpte & mask_4KB
+            if self.isPagePresent(pdpte) and phy_space.is_valid_address(pdpte_addr):
+#                debug.info("Looking in PDPTE %08x" % pdpte_addr)
+                #PDEs are 512 x 64 bit each PDPTE_addr is 4KiB aligned
+                for pd_entry in range(0, 4096, 8):
+                    pde_raw = phy_space.read(pdpte_addr + pd_entry, 0x08)
+                    pde = struct.unpack("<Q", pde_raw)[0]
+                    pde_addr = pde & mask_4KB
+                    #If the Page Size bit is set the the PDE points to 2 MiB physical frame
+                    if self.isPagePresent(pde) and phy_space.is_valid_address(pde_addr):
+                        if self.isExtendedPaging(pde):                        
+                            #Check if the page is in the PDE address space
+                            if (pde & mask_2MB) == (page & mask_2MB):
+                                debug.info("Page %08x is in page %08x" % (page, pde))
+                                return True
+                        else:
+                            #PTEs are 512 x 64 bit each PDE_addr is 4 KiB aligned
+                            for pt_entry in range(0, 4096, 8):
+                                pte_raw = phy_space.read(pde_addr + pt_entry, 0x08)
+                                pte = struct.unpack("<Q", pte_raw)[0]
+                                #Check if the the page is in the PTE address space
+                                if self.isPagePresent(pte):
+                                    if (pte & mask_4KB) == (page & mask_4KB):
+                                        debug.info("Page %08x is in page %08x" % (page, pte))
+                                        return True
+        return False
+
+    def page_dir_validation32(self, page, phy_space):
         '''
         Let's start validating the normal 32 translation
         '''
-        global hypervisor_pages, vmcs_offset
-
-        mask = 0xFFFFF000
-        #cr3_raw = phy_space.read(page + (vmcs_offset["HOST_CR3"]*4), 4)
-        #cr3 = struct.unpack('<I', cr3_raw)[0]
+        global vmcs_offset
+        mask_4KB = 0xFFFFF000
+        mask_4MB = 0xFFC00000
+        
+        cr3_raw = phy_space.read(page + (vmcs_offset["HOST_CR3"]*4), 4)
+        cr3 = struct.unpack('<I', cr3_raw)[0]
 
         # PD
-        found = 0
         for entry in range(0, 4096, 4):
-            try:
-                raw = phy_space.read(cr3 + entry, 0x04)
-                pt_raw = struct.unpack('<I', raw)[0]
-                extended_page = self.isExtendedPaging(pt_raw)
-                page_present = self.isPagePresent(pt_raw)
-            except:
-                continue
-
-            # page is not present
-            if not page_present:
-                continue
-            pt = pt_raw & mask
-
+            raw = phy_space.read(cr3 + entry, 0x04)
+            pde_raw = struct.unpack('<I', raw)[0]
+            pde = pde_raw & mask_4KB
             # Extended present so VA is divided into 2 sections: 31-22 and 21-0
             # first 10 are used as usual :)
-            if extended_page and page_present:
-                extended = 1
-                pt = pt_raw & 0xFFC00000
-
-                # Extended page table - Directly in physical page (10-22)
-                for off in range(0, 4194304, 4):
-                        val = pt + off
-                        if val == page:
-                                return True
-
-            # PT - Normal translation 10 - 10 - 12
-            for off in range(0, 4096, 4):
-                try:
-                    raw = phy_space.read(pt + off, 4)
-                except:
-                    continue
-                try:
-                    pp_raw = struct.unpack('<I', raw)[0]
-                except:
-                    continue
-
-                # the page is not present
-                if not self.isPagePresent(pp_raw): continue
-                pp = pp_raw & mask
-
-                '''
-                Dictionary containing all the pages related to the
-                hypervisor.
-                '''
-                if page not in hypervisor_pages:
-                    hypervisor_pages[page] = []
-                    hypervisor_pages[page].append(pp)
-                else:
-                    hypervisor_pages[page].append(pp)
-
-                if pp == page: found = 1
-
-        if found == 1:
-            return True
-        else:
-            return False
+            if self.isPagePresent(pde_raw) and phy_space.is_valid_address(pde):
+                if self.isExtendedPaging(pde_raw):
+                    if (pde_raw & mask_4MB) == (page & mask_4MB):
+                        return True
+                # PT - Normal translation 10 - 10 - 12
+                for off in range(0, 4096, 4):
+                    raw = phy_space.read(pde + off, 4)
+                    pte_raw = struct.unpack('<I', raw)[0]
+                    if self.isPagePresent(pte_raw):
+                        if (pte_raw & mask_4KB) == (page & mask_4KB):
+                            return True
+        return False
 
 
     '''
@@ -731,13 +663,16 @@ class Hyperls(commands.Command):
 
 
     def calculate(self):
-        global vmcs_offset, memory, vmcs12, nvalidated
+        global vmcs_offset, revision_id, memory, vmcs12, nvalidated
 
         if self._config.GENERIC == False:
+            revision_id = layouts.db.microarch_db[self._config.ARCH]
             if self._config.ARCH == "penryn":
                 vmcs_offset = layouts.penryn.vmcs
             elif self._config.ARCH == "sandy":
                 vmcs_offset = layouts.sandy.vmcs
+            elif self._config.ARCH == "westmere":
+                vmcs_offset = layouts.westmere.vmcs
             else:
                 debug.error("Intel Microarchitecture not valid.")
 
@@ -746,32 +681,35 @@ class Hyperls(commands.Command):
 
         if self._config.GENERIC == False:
             for offset in VmcsScan().scan(phy_space):
-                debug.info(">> Possible VMCS at %08x" % offset)
-
-                # HOST_CR4 check
-                off = vmcs_offset["HOST_CR4"] * 4
-                data = phy_space.read(offset + off, 0x04)
-                cr4 = struct.unpack('<I', data)[0]
-                if cr4 == 0x00 or cr4 == 0xffffffff: continue
-                self.isPAE(cr4)
-
-                if hyper.pae == 0:
-                    cr3_raw = phy_space.read(offset + (vmcs_offset["HOST_CR3"]*4), 4)
-                    cr3 = struct.unpack('<I', cr3_raw)[0]
-
-                    if self.page_dir_validation32(offset, phy_space, cr3):
-                        debug.info("[32 bit] VMCS %08x has been validated" %
-                        offset)
+                debug.info(">> Possible VMCS at %16x" % offset)
+                if not self.isHostPAE(offset, phy_space):
+                    # 32 bit paging 
+                    if self.page_dir_validation32(offset, phy_space):
+                        debug.info("[32 bit] VMCS %08x has been validated" % offset)
                         hyper.vmcs_found.append(offset)
                         yield offset
-                else:
+                    else:
+                        debug.info("[32 bit] VMCS %08x has not been validated" % offset)
+                elif not self.isHostIA32E(offset, phy_space):
+                    # 32 bit PAE paging
+                    if self.page_dir_validation32PAE(offset, phy_space):
+                        debug.info("[32 bit PAE] VMCS %16x has been validated")
+                        hyper.vmcs_found.append(offset)
+                        yield offset
+                    else:
+                        debug.info("[32 bit PAE] VMCS %16x has not been validate")
+                elif self.isHostIA32E(offset, phy_space) and self.isHostPAE(offset, phy_space):
+                    # IA32E paging
                     if self.page_dir_validation64(offset, phy_space):
-                        debug.info("[64 bit] VMCS %08x has been validated" % offset)
+                        debug.info("[64 bit] VMCS %16x has been validated" % offset)
                         hyper.vmcs_found.append(offset)
                         yield offset
-                        hyper.pae = 0
+                    else:
+                        debug.info("[64 bit] VMCS %16x has not been validated" % offset)
+                else:
+                    debug.info("Not possible to validate the VMCS")
 
-            if self._config.NESTED == True:
+            if self._config.NESTED:
                 priv_cr3_list = []
                 for vm in hyper.vmcs_found:
                     cr3_raw = phy_space.read(offset + (vmcs_offset["HOST_CR3"]*4), 4)
@@ -840,6 +778,10 @@ class Hyperls(commands.Command):
             if ((word >> k) & 0x01) == 1:
                 outfd.write("\t\t|_ %s\n" % v)
 
+    def parsing_vmexit_controls(self, outfd, word):
+        for k, v in layouts.vmcs.vmexits_control.items():
+            if ((word >> k) & 0x01) == 1:
+                outfd.write("\t\t|_ %s\n" % v)
 
     def parsing_processor_based_controls(self, outfd, word):
         for k, v in layouts.vmcs.processor_based_execution_controls.items():
@@ -915,7 +857,7 @@ class Hyperls(commands.Command):
 
 
     def parsing_secondary_vm_exec_control(self, outfd, word, address):
-        for k, v in hyper.secondary_exec_controls.items():
+        for k, v in layouts.vmcs.secondary_exec_controls.items():
             if ((word >> k) & 0x01) == 1:
                 outfd.write("\t\t|_ %s\n" % v)
 
@@ -942,7 +884,7 @@ class Hyperls(commands.Command):
                  rip[ip] += 1
 
          list_rip = rip.keys()
-         outfd.write("\t|_ There are %d hypervisors: " % len(list_rip))
+         outfd.write("\t| There are %d hypervisors: " % len(list_rip))
          for i in list_rip:
              outfd.write(" %08x " % i)
          outfd.write("\n")
@@ -988,17 +930,18 @@ class Hyperls(commands.Command):
 
             outfd.write("\n:: Looking for VMCS0N...\n")
             for i in data:
-                    outfd.write("\t|_ VMCS at %08x - EPTP: %08x\n" % 
-                    (i, self.get_vmcs_field(i, vmcs_offset["EPT_POINTER"] * 4, 0x08))) 
+                    if "EPT_POINTER" in vmcs_offset:
+                        outfd.write("\t|_ VMCS at %08x - EPTP: %08x\n" %
+                        (i, self.get_vmcs_field(i, vmcs_offset["EPT_POINTER"] * 4, 0x08)))
+                    else:
+                        outfd.write("\t|_ VMCS at %08x\n" % i)
                     if self._config.VERBOSE:
                         address = i
                         for k,v in vmcs_offset.items():
                             off = v * 4
                             size = layouts.vmcs.vmcs_field_size[k] / 8
                             if k == "VM_EXIT_REASON":
-                                outfd.write("\t|_ %s : %08x - %s\n"   % 
-                                (k, self.get_vmcs_field(address, off, size), 
-                                layouts.vmcs.vmexits[self.get_vmcs_field(address, off, size)]))
+                                outfd.write("\t|_ %s : %08x - %s\n" % (k, self.get_vmcs_field(address, off, size), layouts.vmcs.vmexits[self.get_vmcs_field(address, off, size)]))
                             elif k == "EXCEPTION_BITMAP":
                                 bitmap = self.get_vmcs_field(address, off, size)
                                 outfd.write("\t|_ %s : %08x - %s\n"   % (k, bitmap, bin(bitmap)))
@@ -1014,6 +957,9 @@ class Hyperls(commands.Command):
                             elif k == "CR3_TARGET_COUNT":
                                 outfd.write("\t|_ %s : %08x\n"   % (k, self.get_vmcs_field(address, off, size)))
                                 self.check_cr3(outfd, self.get_vmcs_field(address, off, size))
+                            elif k == "VM_EXIT_CONTROLS":
+                                outfd.write("\t|_ %s : %08x\n"   % (k, self.get_vmcs_field(address, off, size)))
+                                self.parsing_vmexit_controls(outfd, self.get_vmcs_field(address, off, size))
                             else:
                                 outfd.write("\t|_ %s : %x\n" % (k, self.get_vmcs_field(address, off, size)))
                                 if k == "IO_BITMAP_A":
@@ -1027,11 +973,9 @@ class Hyperls(commands.Command):
                         if hyper.iobitmaps == 1:
                             outfd.write("\t|_ Zoom on IO_BITMAPS:\n")
                             self.parse_iobitmaps(outfd)
-
                         self.check_clts_exit(outfd, address)
                         self.check_rdmsr(outfd, address)
                         self.check_wrmsr(outfd, address)
-
             if self._config.NESTED:
                 outfd.write("\n:: Looking for VMCS1N...\n")
                 for nest in set(hyper.nvmcs_found):
@@ -1039,6 +983,7 @@ class Hyperls(commands.Command):
                 self.hierarchy_check(outfd)
 
             self.count_hypervisors(outfd)
+
 
 
 

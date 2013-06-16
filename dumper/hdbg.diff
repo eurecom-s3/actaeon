@@ -1,6 +1,92 @@
---- core/vmx.c	2013-04-15 17:32:47.589022985 +0200
-+++ core/my_vmx.c	2013-04-15 18:53:44.133138710 +0200
-@@ -29,6 +29,7 @@
+diff --git Kbuild Kbuild
+index 6b4ca5b..cacf1e0 100644
+--- Kbuild
++++ Kbuild
+@@ -10,10 +10,10 @@ core-src:= core
+ i386-src:= $(core-src)/i386
+ libudis86-src:= libudis86
+ 
+-DEFINE += -DHVM_ARCH_BITS=32 -DENABLE_HYPERDBG \
++DEFINE += -DHVM_ARCH_BITS=32  \
+ 	  -DGUEST_LINUX -DVIDEO_DEFAULT_RESOLUTION_X=1024 -DVIDEO_DEFAULT_RESOLUTION_Y=768  -DHYPERDBG_VERSION=$(shell date +%Y%m%d)
+ 
+-INCLUDE += -I$(src)/$(hdbg-src) -I$(src)/$(core-src) -I$(src)/$(i386-src) -I$(src)/$(libudis86-src)
++INCLUDE += -I$(src)/$(core-src) -I$(src)/$(i386-src) -I$(src)/$(libudis86-src)
+ EXTRA_CFLAGS += $(DEFINE) $(INCLUDE) -fno-omit-frame-pointer
+ 
+ # DBG += CONFIG_DEBUG_SECTION_MISMATCH=y
+@@ -25,16 +25,11 @@ core-objs:= $(core-src)/pill_linux.o $(core-src)/pill_common.o \
+ 
+ i386-objs:= $(i386-src)/io-asm.o $(i386-src)/common-asm.o $(i386-src)/reg-asm.o $(i386-src)/vmx-asm.o
+ 
+-hyperdbg-objs:= $(hdbg-src)/gui.o $(hdbg-src)/font_256.o  $(hdbg-src)/hyperdbg_cmd.o $(hdbg-src)/hyperdbg_guest.o \
+-	        $(hdbg-src)/hyperdbg_host.o $(hdbg-src)/hyperdbg_print.o $(hdbg-src)/keyboard.o $(hdbg-src)/pager.o $(hdbg-src)/pci.o \
+-	        $(hdbg-src)/scancode.o $(hdbg-src)/sw_bp.o $(hdbg-src)/syms.o $(hdbg-src)/symsearch.o \
+-	        $(hdbg-src)/video.o $(hdbg-src)/xpvideo.o
+-
+ libudis86-objs:= $(libudis86-src)/decode.o $(libudis86-src)/input.o $(libudis86-src)/itab.o $(libudis86-src)/syn-att.o \
+ 	         $(libudis86-src)/syn.o $(libudis86-src)/syn-intel.o $(libudis86-src)/udis86.o
+ 
+ obj-m := hcore.o
+-hcore-objs := $(core-objs) $(i386-objs) $(hyperdbg-objs) $(libudis86-objs)
++hcore-objs := $(core-objs) $(i386-objs) $(libudis86-objs)
+ 
+ all: asm-offset.h
+ 	make $(DBG) -C $(KDIR) M=$(PWD) modules
+diff --git Makefile.linux Makefile.linux
+index 6b4ca5b..cacf1e0 100644
+--- Makefile.linux
++++ Makefile.linux
+@@ -10,10 +10,10 @@ core-src:= core
+ i386-src:= $(core-src)/i386
+ libudis86-src:= libudis86
+ 
+-DEFINE += -DHVM_ARCH_BITS=32 -DENABLE_HYPERDBG \
++DEFINE += -DHVM_ARCH_BITS=32  \
+ 	  -DGUEST_LINUX -DVIDEO_DEFAULT_RESOLUTION_X=1024 -DVIDEO_DEFAULT_RESOLUTION_Y=768  -DHYPERDBG_VERSION=$(shell date +%Y%m%d)
+ 
+-INCLUDE += -I$(src)/$(hdbg-src) -I$(src)/$(core-src) -I$(src)/$(i386-src) -I$(src)/$(libudis86-src)
++INCLUDE += -I$(src)/$(core-src) -I$(src)/$(i386-src) -I$(src)/$(libudis86-src)
+ EXTRA_CFLAGS += $(DEFINE) $(INCLUDE) -fno-omit-frame-pointer
+ 
+ # DBG += CONFIG_DEBUG_SECTION_MISMATCH=y
+@@ -25,16 +25,11 @@ core-objs:= $(core-src)/pill_linux.o $(core-src)/pill_common.o \
+ 
+ i386-objs:= $(i386-src)/io-asm.o $(i386-src)/common-asm.o $(i386-src)/reg-asm.o $(i386-src)/vmx-asm.o
+ 
+-hyperdbg-objs:= $(hdbg-src)/gui.o $(hdbg-src)/font_256.o  $(hdbg-src)/hyperdbg_cmd.o $(hdbg-src)/hyperdbg_guest.o \
+-	        $(hdbg-src)/hyperdbg_host.o $(hdbg-src)/hyperdbg_print.o $(hdbg-src)/keyboard.o $(hdbg-src)/pager.o $(hdbg-src)/pci.o \
+-	        $(hdbg-src)/scancode.o $(hdbg-src)/sw_bp.o $(hdbg-src)/syms.o $(hdbg-src)/symsearch.o \
+-	        $(hdbg-src)/video.o $(hdbg-src)/xpvideo.o
+-
+ libudis86-objs:= $(libudis86-src)/decode.o $(libudis86-src)/input.o $(libudis86-src)/itab.o $(libudis86-src)/syn-att.o \
+ 	         $(libudis86-src)/syn.o $(libudis86-src)/syn-intel.o $(libudis86-src)/udis86.o
+ 
+ obj-m := hcore.o
+-hcore-objs := $(core-objs) $(i386-objs) $(hyperdbg-objs) $(libudis86-objs)
++hcore-objs := $(core-objs) $(i386-objs) $(libudis86-objs)
+ 
+ all: asm-offset.h
+ 	make $(DBG) -C $(KDIR) M=$(PWD) modules
+diff --git core/vmx.c core/vmx.c
+index f7636af..152af35 100644
+--- core/vmx.c
++++ core/vmx.c
+@@ -18,7 +18,12 @@
+   
+   You should have received a copy of the GNU General Public License along with
+   this program. If not, see <http://www.gnu.org/licenses/>.
+-  
++
++ ==================================================================================
++
++  Patched version of core/vmx.c to dump VMCS offset. Don't use it if you really want to use Hyperdbg. It won't work!
++
++  Mariano 'emdel' Graziano <graziano@eurecom.fr>;
+ */
+ 
+ #ifdef GUEST_WINDOWS
+@@ -29,6 +34,7 @@
  #include <linux/mempool.h>
  #endif
  
@@ -8,7 +94,58 @@
  #include "types.h"
  #include "vt.h"
  #include "idt.h"
-@@ -193,13 +194,15 @@
+@@ -47,8 +53,8 @@
+ #define VMX_MEMTYPE_UNCACHEABLE 0
+ #define VMX_MEMTYPE_WRITEBACK   6
+ 
+-static struct {
+-  Bit32u ExitReason;
++  static struct {
++    Bit32u ExitReason;
+   Bit32u ExitQualification;
+   Bit32u ExitInterruptionInformation;
+   Bit32u ExitInterruptionErrorCode;
+@@ -75,12 +81,12 @@ static Bit32u     VmxGetExitInstructionLength(void);
+ 
+ static hvm_status          VmxVmcsInitialize(hvm_address guest_stack, hvm_address guest_return, hvm_address host_cr3);
+ static Bit32u     USESTACK VmxVmcsRead(Bit32u encoding);
+-       void       USESTACK VmxVmcsWrite(Bit32u encoding, Bit32u value) asm("_VmxVmcsWrite");
++void       USESTACK VmxVmcsWrite(Bit32u encoding, Bit32u value) asm("_VmxVmcsWrite");
+ 
+ static hvm_status VmxHvmSwitchOff(void);
+ static hvm_status VmxHvmUpdateEvents(void);
+ static void       VmxHvmInjectHwException(Bit32u trap, Bit32u type);
+-       void       VmxHvmInternalHandleExit(void) asm("_VmxHvmInternalHandleExit");
++void       VmxHvmInternalHandleExit(void) asm("_VmxHvmInternalHandleExit");
+ /* Internal VMX functions (i.e., not used outside this module) */
+ static void       VmxInternalHandleCR(void);
+ static void       VmxInternalHandleIO(void);
+@@ -167,19 +173,19 @@ void USESTACK VmxVmcsWrite(Bit32u encoding, Bit32u value)
+ {
+   /* Adjust the value, if needed */
+   switch (encoding) {
+-  case CPU_BASED_VM_EXEC_CONTROL:
++    case CPU_BASED_VM_EXEC_CONTROL:
+     value = VmxAdjustControls(value, IA32_VMX_PROCBASED_CTLS);
+     break;
+-  case PIN_BASED_VM_EXEC_CONTROL:
++    case PIN_BASED_VM_EXEC_CONTROL:
+     value = VmxAdjustControls(value, IA32_VMX_PINBASED_CTLS);
+     break;
+-  case VM_ENTRY_CONTROLS:
++    case VM_ENTRY_CONTROLS:
+     value = VmxAdjustControls(value, IA32_VMX_ENTRY_CTLS);
+     break;
+-  case VM_EXIT_CONTROLS:
++    case VM_EXIT_CONTROLS:
+     value = VmxAdjustControls(value, IA32_VMX_EXIT_CTLS);
+     break;
+-  default:
++    default:
+     break;
+   }
+ 
+@@ -193,280 +199,763 @@ static hvm_bool VmxIsEnabled(void)
  
  static hvm_status VmxVmcsInitialize(hvm_address guest_stack, hvm_address guest_return, hvm_address host_cr3)
  {
@@ -23,144 +160,250 @@
 +  Bit32u temp32, gdt_base, idt_base, offset, v;
 +  hvm_phy_address physical_host_rip, physical_vmcs;
  
-   // GDT Info
+-  // GDT Info
++// GDT Info
    __asm__ __volatile__ (
-@@ -270,14 +273,169 @@
-   //  ***********************************
-   //  *	H.1.1 16-Bit Guest-State Fields *
-   //  ***********************************
-+  
-+ for(i = 0; i < 1024; i += 1)
-+ {
-+ //GuestLog("Pill: %x" , i);
-+ *(vmxInitState.pVMCSRegion + i) =  i;
-+ }
+-			"sgdt %0\n"
+-			:"=m"(gdt_reg)
+-			::"memory"
+-			);
++   "sgdt %0\n"
++   :"=m"(gdt_reg)
++   ::"memory"
++   );
+   gdt_base = (gdt_reg.BaseHi << 16) | gdt_reg.BaseLo;
+-	
+-  // IDT Segment Selector
++
++// IDT Segment Selector
+   __asm__ __volatile__ (
+-			"sidt %0\n"
+-			:"=m"(idt_reg)
+-			::"memory"
+-			);
++   "sidt %0\n"
++   :"=m"(idt_reg)
++   ::"memory"
++   );
+   idt_base = (idt_reg.BaseHi << 16) | idt_reg.BaseLo;	
+ 
+-  //  27.6 PREPARATION AND LAUNCHING A VIRTUAL MACHINE
+-  // (1) Create a VMCS region in non-pageable memory of size specified by
+-  //	 the VMX capability MSR IA32_VMX_BASIC and aligned to 4-KBytes.
+-  //	 Software should read the capability MSRs to determine width of the 
+-  //	 physical addresses that may be used for a VMCS region and ensure
+-  //	 the entire VMCS region can be addressed by addresses with that width.
+-  //	 The term "guest-VMCS address" refers to the physical address of the
+-  //	 new VMCS region for the following steps.
++//  27.6 PREPARATION AND LAUNCHING A VIRTUAL MACHINE
++// (1) Create a VMCS region in non-pageable memory of size specified by
++//	 the VMX capability MSR IA32_VMX_BASIC and aligned to 4-KBytes.
++//	 Software should read the capability MSRs to determine width of the 
++//	 physical addresses that may be used for a VMCS region and ensure
++//	 the entire VMCS region can be addressed by addresses with that width.
++//	 The term "guest-VMCS address" refers to the physical address of the
++//	 new VMCS region for the following steps.
+ 
+   ReadMSR(IA32_VMX_BASIC_MSR_CODE, (PMSR) &vmxBasicMsr);
+ 
+   switch(vmxBasicMsr.MemType) {
+-  case VMX_MEMTYPE_UNCACHEABLE:
++    case VMX_MEMTYPE_UNCACHEABLE:
+     Log("Unsupported memory type %.8x", vmxBasicMsr.MemType);
+     return HVM_STATUS_UNSUCCESSFUL;
+     break;
+-  case VMX_MEMTYPE_WRITEBACK:
++    case VMX_MEMTYPE_WRITEBACK:
+     break;
+-  default:
++    default:
+     Log("ERROR: Unknown VMCS region memory type");
+     return HVM_STATUS_UNSUCCESSFUL;
+     break;
+   }
+-	
+-  // (2) Initialize the version identifier in the VMCS (first 32 bits)
+-  //	 with the VMCS revision identifier reported by the VMX
+-  //	 capability MSR IA32_VMX_BASIC.
++
++// (2) Initialize the version identifier in the VMCS (first 32 bits)
++//	 with the VMCS revision identifier reported by the VMX
++//	 capability MSR IA32_VMX_BASIC.
+   *(vmxInitState.pVMCSRegion) = vmxBasicMsr.RevId;
+ 
+-  // (3) Execute the VMCLEAR instruction by supplying the guest-VMCS address.
+-  //	 This will initialize the new VMCS region in memory and set the launch
+-  //	 state of the VMCS to "clear". This action also invalidates the
+-  //	 working-VMCS pointer register to FFFFFFFF_FFFFFFFFH. Software should
+-  //	 verify successful execution of VMCLEAR by checking if RFLAGS.CF = 0
+-  //	 and RFLAGS.ZF = 0.
++// (3) Execute the VMCLEAR instruction by supplying the guest-VMCS address.
++//	 This will initialize the new VMCS region in memory and set the launch
++//	 state of the VMCS to "clear". This action also invalidates the
++//	 working-VMCS pointer register to FFFFFFFF_FFFFFFFFH. Software should
++//	 verify successful execution of VMCLEAR by checking if RFLAGS.CF = 0
++//	 and RFLAGS.ZF = 0.
+   FLAGS_TO_ULONG(rflags) = VmxClear(GET32H(vmxInitState.PhysicalVMCSRegionPtr), GET32L(vmxInitState.PhysicalVMCSRegionPtr));
+ 
+   if(rflags.CF != 0 || rflags.ZF != 0) {
+     Log("ERROR: VMCLEAR operation failed");
+     return HVM_STATUS_UNSUCCESSFUL;
+   }
+-	
++
+   Log("SUCCESS: VMCLEAR operation completed");
+-	
+-  // (4) Execute the VMPTRLD instruction by supplying the guest-VMCS address.
+-  //	 This initializes the working-VMCS pointer with the new VMCS region's
+-  //	 physical address.
 +
 +
-+  v = VmxVmcsRead(0x00002004);
-+  GuestLog("ADDRESS_MSR_BITMAPS entry #: %08x" , v);
++//
++//  ***********************************
++//  *	H.1.1 16-Bit Guest-State Fields *
++//  ***********************************
 +
-+v = VmxVmcsRead(0x00002006);
-+  GuestLog("VM_EXIT_MSR_STORE_ADDR entry #: %08x" , v);
++  for(i = 8; i < 1024; i += 1)
++  {
++//GuestLog("Pill: %x" , i);
++   *(vmxInitState.pVMCSRegion + i) =  i;
++  }
 +
-+v = VmxVmcsRead(0x00002005);
-+  GuestLog("ADDRESS_MSR_BITMAPS_HIGH entry #: %08x" , v);
 +
-+v = VmxVmcsRead(0x00002007);
-+  GuestLog("VM_EXIT_MSR_STORE_ADDR_HIGH entry #: %08x" , v);
-+
-+v = VmxVmcsRead(0x00002008);
-+  GuestLog("VM_EXIT_MSR_LOAD_ADDR entry #: %08x" , v);
-+
-+v = VmxVmcsRead(0x00002009);
-+  GuestLog("VM_EXIT_MSR_LOAD_ADDR_HIGH entry #: %08x" , v);
-+
-+v = VmxVmcsRead(0x0000200A);
-+  GuestLog("VM_ENTRY_MSR_LOAD_ADDR entry #: %08x" , v);
-+
-+v = VmxVmcsRead(0x0000200B);
-+  GuestLog("VM_ENTRY_MSR_LOAD_ADDR_HIGH entry #: %08x" , v);
-+
-+v = VmxVmcsRead(VIRTUAL_APIC_PAGE_ADDR);
-+  GuestLog("VIRTUAL_APIC_PAGE_ADDR entry #: %08x" , v);
-+
-+v = VmxVmcsRead(VIRTUAL_APIC_PAGE_ADDR_HIGH);
-+  GuestLog("VIRTUAL_APIC_PAGE_ADDR_HIGH entry #: %08x" , v);
-+
-+v = VmxVmcsRead(0x00002014);
-+  GuestLog("APIC_ACCESS_ADDR entry #: %08x" , v);
-+
-+v = VmxVmcsRead(0x00002015);
-+  GuestLog("APIC_ACCESS_ADDR_HIGH entry #: %08x" , v);
-+
-+v = VmxVmcsRead(0x0000200C);
-+  GuestLog("EXECUTIVE_VMCS_POINTER entry #: %08x" , v);
-+
-+v = VmxVmcsRead(0x0000200D);
-+  GuestLog("EXECUTIVE_VMCS_POINTER_HIGH entry #: %08x" , v);
-+
-+v = VmxVmcsRead(EXCEPTION_BITMAP);
-+  GuestLog("EXCEPTION_BITMAP entry #: %08x" , v);
-+
-+v = VmxVmcsRead(VM_EXIT_REASON);
-+  GuestLog("VM_EXIT_REASON entry #: %08x" , v);
-+
-+v = VmxVmcsRead(EXIT_QUALIFICATION);
-+  GuestLog("EXIT_QUALIFICATION entry #: %08x" , v);
-+
-+v = VmxVmcsRead(VMX_INSTRUCTION_INFO);
-+  GuestLog("VMX_INSTRUCTION_INFO entry #: %08x" , v);
-+
-+v = VmxVmcsRead(VM_EXIT_INTR_INFO);
-+  GuestLog("VM_EXIT_INTR_INFO entry #: %08x" , v);
-+
-+v = VmxVmcsRead(VM_EXIT_INTR_ERROR_CODE);
-+  GuestLog("VM_EXIT_INTR_ERROR_CODE entry #: %08x" , v);
-+
-+v = VmxVmcsRead(IDT_VECTORING_INFO_FIELD);
-+  GuestLog("IDT_VECTORING_INFO_FIELD entry #: %08x" , v);
-+
-+v = VmxVmcsRead(IDT_VECTORING_ERROR_CODE);
-+  GuestLog("IDT_VECTORING_ERROR_CODE entry #: %08x" , v);
-+
-+v = VmxVmcsRead(VM_EXIT_INSTRUCTION_LEN);
-+  GuestLog("VM_EXIT_INSTRUCTION_LEN entry #: %08x" , v);
-+
-+v = VmxVmcsRead(0x0000440E);
-+  GuestLog("VM_EXIT_INSTRUCTION_INFO entry #: %08x" , v);
++// (4) Execute the VMPTRLD instruction by supplying the guest-VMCS address.
++//	 This initializes the working-VMCS pointer with the new VMCS region's
++//	 physical address.
+   VmxPtrld(GET32H(vmxInitState.PhysicalVMCSRegionPtr), GET32L(vmxInitState.PhysicalVMCSRegionPtr));
+ 
+-  //
+-  //  ***********************************
+-  //  *	H.1.1 16-Bit Guest-State Fields *
+-  //  ***********************************
  
 -  VmxVmcsWrite(GUEST_CS_SELECTOR,   RegGetCs() & 0xfff8);
-+v = VmxVmcsRead(SECONDARY_VM_EXEC_CONTROL);
++  v = VmxVmcsRead(0x00002004);
++  GuestLog("ADDRESS_MSR_BITMAPS entry #: %.8x" , v);
++
++  v = VmxVmcsRead(0x00002006);
++  GuestLog("VM_EXIT_MSR_STORE_ADDR entry #: %08x" , v);
++
++  v = VmxVmcsRead(0x00002005);
++  GuestLog("ADDRESS_MSR_BITMAPS_HIGH entry #: %08x" , v);
++
++  v = VmxVmcsRead(0x00002007);
++  GuestLog("VM_EXIT_MSR_STORE_ADDR_HIGH entry #: %08x" , v);
++
++  v = VmxVmcsRead(0x00002008);
++  GuestLog("VM_EXIT_MSR_LOAD_ADDR entry #: %08x" , v);
++
++  v = VmxVmcsRead(0x00002009);
++  GuestLog("VM_EXIT_MSR_LOAD_ADDR_HIGH entry #: %08x" , v);
++
++  v = VmxVmcsRead(0x0000200A);
++  GuestLog("VM_ENTRY_MSR_LOAD_ADDR entry #: %08x" , v);
++
++  v = VmxVmcsRead(0x0000200B);
++  GuestLog("VM_ENTRY_MSR_LOAD_ADDR_HIGH entry #: %08x" , v);
++
++  v = VmxVmcsRead(VIRTUAL_APIC_PAGE_ADDR);
++  GuestLog("VIRTUAL_APIC_PAGE_ADDR entry #: %08x" , v);
++
++  v = VmxVmcsRead(VIRTUAL_APIC_PAGE_ADDR_HIGH);
++  GuestLog("VIRTUAL_APIC_PAGE_ADDR_HIGH entry #: %08x" , v);
++
++  v = VmxVmcsRead(0x00002014);
++  GuestLog("APIC_ACCESS_ADDR entry #: %08x" , v);
++
++  v = VmxVmcsRead(0x00002015);
++  GuestLog("APIC_ACCESS_ADDR_HIGH entry #: %08x" , v);
++
++  v = VmxVmcsRead(0x0000200C);
++  GuestLog("EXECUTIVE_VMCS_POINTER entry #: %08x" , v);
++
++  v = VmxVmcsRead(0x0000200D);
++  GuestLog("EXECUTIVE_VMCS_POINTER_HIGH entry #: %08x" , v);
++
++  v = VmxVmcsRead(EXCEPTION_BITMAP);
++  GuestLog("EXCEPTION_BITMAP entry #: %08x" , v);
++
++  v = VmxVmcsRead(VM_EXIT_REASON);
++  GuestLog("VM_EXIT_REASON entry #: %08x" , v);
++
++  v = VmxVmcsRead(EXIT_QUALIFICATION);
++  GuestLog("EXIT_QUALIFICATION entry #: %08x" , v);
++
++  v = VmxVmcsRead(VMX_INSTRUCTION_INFO);
++  GuestLog("VMX_INSTRUCTION_INFO entry #: %08x" , v);
++
++  v = VmxVmcsRead(VM_EXIT_INTR_INFO);
++  GuestLog("VM_EXIT_INTR_INFO entry #: %08x" , v);
++
++  v = VmxVmcsRead(VM_EXIT_INTR_ERROR_CODE);
++  GuestLog("VM_EXIT_INTR_ERROR_CODE entry #: %08x" , v);
++
++  v = VmxVmcsRead(IDT_VECTORING_INFO_FIELD);
++  GuestLog("IDT_VECTORING_INFO_FIELD entry #: %08x" , v);
++
++  v = VmxVmcsRead(IDT_VECTORING_ERROR_CODE);
++  GuestLog("IDT_VECTORING_ERROR_CODE entry #: %08x" , v);
++
++  v = VmxVmcsRead(VM_EXIT_INSTRUCTION_LEN);
++  GuestLog("VM_EXIT_INSTRUCTION_LEN entry #: %08x" , v);
++
++  v = VmxVmcsRead(0x0000440E);
++  GuestLog("VM_EXIT_INSTRUCTION_INFO entry #: %08x" , v);
++
++  v = VmxVmcsRead(SECONDARY_VM_EXEC_CONTROL);
 +  GuestLog("SECONDARY_VM_EXEC_CONTROL entry #: %08x" , v);
 +
-+v = VmxVmcsRead(0x00004828);
++  v = VmxVmcsRead(0x00004828);
 +  GuestLog("GUEST_SMBASE entry #: %08x" , v);
 +
-+v = VmxVmcsRead(0x00004018);
++  v = VmxVmcsRead(0x00004018);
 +  GuestLog("VM_ENTRY_EXCEPTION_ERROR_CODE entry #: %08x" , v);
 +
-+v = VmxVmcsRead(0x0000401A);
++  v = VmxVmcsRead(0x0000401A);
 +  GuestLog("VM_ENTRY_INSTRUCTION_LENGTH entry #: %08x" , v);
 +
-+v = VmxVmcsRead(0x0000401C);
++  v = VmxVmcsRead(0x0000401C);
 +  GuestLog("TPR_THRESHOLD entry #: %08x" , v);
 +
-+v = VmxVmcsRead(0x00002C04);
++  v = VmxVmcsRead(0x00002C04);
 +  GuestLog("HOST_IA32_PERF_GLOBAL_CTRL entry #: %08x" , v);
 +
-+v = VmxVmcsRead(0x00002C05);
++  v = VmxVmcsRead(0x00002C05);
 +  GuestLog("HOST_IA32_PERF_GLOBAL_CTRL_HIGH entry #: %08x" , v);
 +
-+v = VmxVmcsRead(0x00006000);
++  v = VmxVmcsRead(0x00006000);
 +  GuestLog("CR0_GUEST_HOST_MASK entry #: %08x" , v);
 +
-+v = VmxVmcsRead(0x00006002);
++  v = VmxVmcsRead(0x00006002);
 +  GuestLog("CR4_GUEST_HOST_MASK entry #: %08x" , v);
 +
-+v = VmxVmcsRead(0x00006004);
++  v = VmxVmcsRead(0x00006004);
 +  GuestLog("CR0_READ_SHADOW entry #: %08x" , v);
 +
-+v = VmxVmcsRead(0x00006006);
++  v = VmxVmcsRead(0x00006006);
 +  GuestLog("CR4_READ_SHADOW entry #: %08x" , v);
 +
-+v = VmxVmcsRead(0x00006402);
++  v = VmxVmcsRead(0x00006402);
 +  GuestLog("IO_RCX entry #: %08x" , v);
 +
-+v = VmxVmcsRead(0x00006404);
++  v = VmxVmcsRead(0x00006404);
 +  GuestLog("IO_RSI entry #: %08x" , v);
 +
-+v = VmxVmcsRead(0x00006406);
++  v = VmxVmcsRead(0x00006406);
 +  GuestLog("IO_RDI entry #: %08x" , v);
 +
-+v = VmxVmcsRead(0x00006408);
++  v = VmxVmcsRead(0x00006408);
 +  GuestLog("IO_RIP entry #: %08x" , v);
 +
-+v = VmxVmcsRead(0x0000640A);
++  v = VmxVmcsRead(0x0000640A);
 +  GuestLog("GUEST_LINEAR_ADDRESS entry #: %08x" , v);
 +
 +
 +
-+  //VmxVmcsWrite(GUEST_CS_SELECTOR,   RegGetCs() & 0xfff8);
++//VmxVmcsWrite(GUEST_CS_SELECTOR,   RegGetCs() & 0xfff8);
 +  v = VmxVmcsRead(GUEST_CS_SELECTOR);
 +  GuestLog("GUEST_CS_SELECTOR entry #: %08x" , v);
 +
@@ -194,88 +437,95 @@
 +  GuestLog("Guest LDTR Selector: %.08x\n" ,  RegGetLdtr() & 0xfff8);
 +
  
-   /* Guest TR selector */
-   __asm__ __volatile__	(
-@@ -286,187 +444,511 @@
- 			 ::"memory"
- 			 );
+-  /* Guest TR selector */
+-  __asm__ __volatile__	(
+-			 "str %0\n"
+-			 :"=m"(seg_selector)
+-			 ::"memory"
+-			 );
++/* Guest TR selector */
++   __asm__ __volatile__	(
++    "str %0\n"
++    :"=m"(seg_selector)
++    ::"memory"
++    );
    CmClearBit16(&seg_selector, 2); // TI Flag
-+ 
++
 +  v = VmxVmcsRead(GUEST_TR_SELECTOR);
 +  GuestLog("GUEST_TR_SELECTOR entry #: %08x" , v); 
-+ 
++
    VmxVmcsWrite(GUEST_TR_SELECTOR, seg_selector & 0xfff8);
 +  GuestLog("GUEST_TR_SELECTOR: %.08x\n" ,  seg_selector & 0xfff8);
 +
- 
-   //  **********************************
-   //  *	H.1.2 16-Bit Host-State Fields *
-   //  **********************************
- 
-+   v = VmxVmcsRead(HOST_CS_SELECTOR);
-+  GuestLog("HOST_CS_SELECTOR entry #: %08x" , v);
 +
++//  **********************************
++//  *	H.1.2 16-Bit Host-State Fields *
++//  **********************************
+ 
+-  //  **********************************
+-  //  *	H.1.2 16-Bit Host-State Fields *
+-  //  **********************************
++  v = VmxVmcsRead(HOST_CS_SELECTOR);
++  GuestLog("HOST_CS_SELECTOR entry #: %08x" , v);
+ 
    VmxVmcsWrite(HOST_CS_SELECTOR, RegGetCs() & 0xfff8);
--  VmxVmcsWrite(HOST_SS_SELECTOR, RegGetSs() & 0xfff8);
--  VmxVmcsWrite(HOST_DS_SELECTOR, RegGetDs() & 0xfff8);
--  VmxVmcsWrite(HOST_ES_SELECTOR, RegGetEs() & 0xfff8);
--  VmxVmcsWrite(HOST_FS_SELECTOR, RegGetFs() & 0xfff8);
--  VmxVmcsWrite(HOST_GS_SELECTOR, RegGetGs() & 0xfff8);
--  VmxVmcsWrite(HOST_TR_SELECTOR, RegGetTr() & 0xfff8);
 +  GuestLog("Host CS Selector: %.08x\n" ,  RegGetCs() & 0xfff8);
 +
-+   v = VmxVmcsRead(HOST_SS_SELECTOR);
++  v = VmxVmcsRead(HOST_SS_SELECTOR);
 +  GuestLog("HOST_SS_SELECTOR entry #: %08x" , v);
 +  
-+VmxVmcsWrite(HOST_SS_SELECTOR, RegGetSs() & 0xfff8);
+   VmxVmcsWrite(HOST_SS_SELECTOR, RegGetSs() & 0xfff8);
 +  GuestLog("Host SS Selector: %.08x\n" ,  RegGetSs() & 0xfff8);
 +
-+ v = VmxVmcsRead(HOST_DS_SELECTOR);
++  v = VmxVmcsRead(HOST_DS_SELECTOR);
 +  GuestLog("HOST_DS_SELECTOR entry #: %08x" , v);
 +  
-+VmxVmcsWrite(HOST_DS_SELECTOR, RegGetDs() & 0xfff8);
+   VmxVmcsWrite(HOST_DS_SELECTOR, RegGetDs() & 0xfff8);
 +  GuestLog("Host DS Selector: %.08x\n" ,  RegGetDs() & 0xfff8);
 +  
-+ v = VmxVmcsRead(HOST_ES_SELECTOR);
++  v = VmxVmcsRead(HOST_ES_SELECTOR);
 +  GuestLog("HOST_ES_SELECTOR entry #: %08x" , v);
 +
 +
-+VmxVmcsWrite(HOST_ES_SELECTOR, RegGetEs() & 0xfff8);
+   VmxVmcsWrite(HOST_ES_SELECTOR, RegGetEs() & 0xfff8);
 +  GuestLog("Host ES Selector: %.08x\n" ,  RegGetEs() & 0xfff8);
 +  
 +  v = VmxVmcsRead(HOST_FS_SELECTOR);
 +  GuestLog("HOST_FS_SELECTOR entry #: %08x" , v);
 +
-+VmxVmcsWrite(HOST_FS_SELECTOR, RegGetFs() & 0xfff8);
+   VmxVmcsWrite(HOST_FS_SELECTOR, RegGetFs() & 0xfff8);
 +  GuestLog("Host FS Selector: %.08x\n" ,  RegGetFs() & 0xfff8);
 +  
 +  v = VmxVmcsRead(HOST_GS_SELECTOR);
 +  GuestLog("HOST_GS_SELECTOR entry #: %08x" , v);
 +
-+VmxVmcsWrite(HOST_GS_SELECTOR, RegGetGs() & 0xfff8);
+   VmxVmcsWrite(HOST_GS_SELECTOR, RegGetGs() & 0xfff8);
 +  GuestLog("Host GS Selector: %.08x\n" ,  RegGetGs() & 0xfff8);
 +  
-+v = VmxVmcsRead(HOST_TR_SELECTOR);
++  v = VmxVmcsRead(HOST_TR_SELECTOR);
 +  GuestLog("HOST_TR_SELECTOR entry #: %08x" , v);
 +
 +
-+VmxVmcsWrite(HOST_TR_SELECTOR, RegGetTr() & 0xfff8);
+   VmxVmcsWrite(HOST_TR_SELECTOR, RegGetTr() & 0xfff8);
 +  GuestLog("Host TR Selector: %.08x\n" ,  RegGetTr() & 0xfff8);
+ 
+-  //  ***********************************
+-  //  *	H.2.2 64-Bit Guest-State Fields *
+-  //  ***********************************
 +
- 
-   //  ***********************************
-   //  *	H.2.2 64-Bit Guest-State Fields *
-   //  ***********************************
- 
-+  //GuestLog("VMCS Physical Address: 0x%.8x: 0x%.8x\n", GET32H(vmxInitState.PhysicalVMCSRegionPtr), GET32L(vmxInitState.PhysicalVMCSRegionPtr));
-+  
++//  ***********************************
++//  *	H.2.2 64-Bit Guest-State Fields *
++//  ***********************************
++
++//GuestLog("VMCS Physical Address: 0x%.8x: 0x%.8x\n", GET32H(vmxInitState.PhysicalVMCSRegionPtr), GET32L(vmxInitState.PhysicalVMCSRegionPtr));
++
 +  v = VmxVmcsRead(VMCS_LINK_POINTER);
 +  GuestLog("VMCS_LINK_POINTER entry #: %08x" , v);
 +
 +
 +  v = VmxVmcsRead(VMCS_LINK_POINTER_HIGH);
 +  GuestLog("VMCS_LINK_POINTER_HIGH entry #: %08x" , v);
-+
+ 
    VmxVmcsWrite(VMCS_LINK_POINTER, 0xFFFFFFFF);
 +  GuestLog("VMCS LINK POINTER : %.08x\n" ,  0xFFFFFFFF);
 +
@@ -331,32 +581,29 @@
 +  GuestLog("IO_BITMAP_A_HIGH entry #: %08x" , v);
 +
    VmxVmcsWrite(IO_BITMAP_A_HIGH, GET32H(vmxInitState.PhysicalIOBitmapA));  
--  VmxVmcsWrite(IO_BITMAP_A,      GET32L(vmxInitState.PhysicalIOBitmapA)); 
--  VmxVmcsWrite(IO_BITMAP_B_HIGH, GET32H(vmxInitState.PhysicalIOBitmapB));  
--  VmxVmcsWrite(IO_BITMAP_B,      GET32L(vmxInitState.PhysicalIOBitmapB)); 
 +  GuestLog("IO BITMAP A HIGH: %.08x\n" ,  GET32H(vmxInitState.PhysicalIOBitmapA));
 +
 +  v = VmxVmcsRead(IO_BITMAP_A);
 +  GuestLog("IO_BITMAP_A entry #: %08x" , v);  
 +
-+VmxVmcsWrite(IO_BITMAP_A,      GET32L(vmxInitState.PhysicalIOBitmapA)); 
+   VmxVmcsWrite(IO_BITMAP_A,      GET32L(vmxInitState.PhysicalIOBitmapA)); 
 +  GuestLog("IO BITMAP A: %.08x\n" ,  GET32L(vmxInitState.PhysicalIOBitmapA));
 +
 +
-+  
++
 +  //offset = vmxInitState.PhysicalIOBitmapA - vmxInitState.PhysicalVMCSRegionPtr;
 +  //GuestLog("OFFSET: %08x" , offset);
 +  
 +  v = VmxVmcsRead(IO_BITMAP_B_HIGH);
 +  GuestLog("IO_BITMAP_B_HIGH entry #: %08x" , v);
 +
-+VmxVmcsWrite(IO_BITMAP_B_HIGH, GET32H(vmxInitState.PhysicalIOBitmapB));  
+   VmxVmcsWrite(IO_BITMAP_B_HIGH, GET32H(vmxInitState.PhysicalIOBitmapB));  
 +  GuestLog("IO BITMAP B HIGH: %.08x\n" ,  GET32H(vmxInitState.PhysicalIOBitmapB));
 +  
 +  v = VmxVmcsRead(IO_BITMAP_B);
 +  GuestLog("IO_BITMAP_B entry #: %08x" , v);
 +
-+VmxVmcsWrite(IO_BITMAP_B,      GET32L(vmxInitState.PhysicalIOBitmapB)); 
+   VmxVmcsWrite(IO_BITMAP_B,      GET32L(vmxInitState.PhysicalIOBitmapB)); 
 +  GuestLog("IO BITMAP B: %.08x\n" ,  GET32L(vmxInitState.PhysicalIOBitmapB));
  
    /* Time-stamp counter offset */
@@ -383,53 +630,53 @@
 +  GuestLog("CR3_TARGET_COUNT entry #: %08x" , v);
    VmxVmcsWrite(CR3_TARGET_COUNT, 0);
 +
-+v = VmxVmcsRead(CR3_TARGET_VALUE0);
++  v = VmxVmcsRead(CR3_TARGET_VALUE0);
 +  GuestLog("CR3_TARGET_VALUE0 entry #: %08x" , v);
    VmxVmcsWrite(CR3_TARGET_VALUE0, 0);
 +
 +
-+v = VmxVmcsRead(CR3_TARGET_VALUE1);
++  v = VmxVmcsRead(CR3_TARGET_VALUE1);
 +  GuestLog("CR3_TARGET_VALUE1 entry #: %08x" , v);
    VmxVmcsWrite(CR3_TARGET_VALUE1, 0);                        
 +
-+v = VmxVmcsRead(CR3_TARGET_VALUE2);
++  v = VmxVmcsRead(CR3_TARGET_VALUE2);
 +  GuestLog("CR3_TARGET_VALUE2 entry #: %08x" , v);
    VmxVmcsWrite(CR3_TARGET_VALUE2, 0);
 +
-+v = VmxVmcsRead(CR3_TARGET_VALUE3);
++  v = VmxVmcsRead(CR3_TARGET_VALUE3);
 +  GuestLog("CR3_TARGET_VALUE3 entry #: %08x" , v);
    VmxVmcsWrite(CR3_TARGET_VALUE3, 0);
  
    /* VM-exit controls */
 +
-+v = VmxVmcsRead(VM_EXIT_CONTROLS);
++  v = VmxVmcsRead(VM_EXIT_CONTROLS);
 +  GuestLog("VM_EXIT_CONTROLS entry #: %08x" , v);
    temp32 = 0;
    CmSetBit32(&temp32, VM_EXIT_ACK_INTERRUPT_ON_EXIT);
    VmxVmcsWrite(VM_EXIT_CONTROLS, temp32);
  
    /* VM-entry controls */
-+v = VmxVmcsRead(VM_ENTRY_CONTROLS);
++  v = VmxVmcsRead(VM_ENTRY_CONTROLS);
 +  GuestLog("VM_ENTRY_CONTROLS entry #: %08x" , v);
    VmxVmcsWrite(VM_ENTRY_CONTROLS, 0);
  
-+v = VmxVmcsRead(VM_EXIT_MSR_STORE_COUNT);
++  v = VmxVmcsRead(VM_EXIT_MSR_STORE_COUNT);
 +  GuestLog("VM_EXIT_MSR_STORE_COUNT entry #: %08x" , v);
    VmxVmcsWrite(VM_EXIT_MSR_STORE_COUNT, 0);
--  VmxVmcsWrite(VM_EXIT_MSR_LOAD_COUNT, 0);
 +  
-+v = VmxVmcsRead(VM_EXIT_MSR_LOAD_COUNT);
++  v = VmxVmcsRead(VM_EXIT_MSR_LOAD_COUNT);
 +  GuestLog("VM_EXIT_MSR_LOAD_COUNT entry #: %08x" , v);
-+VmxVmcsWrite(VM_EXIT_MSR_LOAD_COUNT, 0);
+   VmxVmcsWrite(VM_EXIT_MSR_LOAD_COUNT, 0);
  
-+v = VmxVmcsRead(VM_ENTRY_MSR_LOAD_COUNT);
++  v = VmxVmcsRead(VM_ENTRY_MSR_LOAD_COUNT);
 +  GuestLog("VM_ENTRY_MSR_LOAD_COUNT entry #: %08x" , v);
    VmxVmcsWrite(VM_ENTRY_MSR_LOAD_COUNT, 0);
 +
-+v = VmxVmcsRead(VM_ENTRY_INTR_INFO_FIELD);
++  v = VmxVmcsRead(VM_ENTRY_INTR_INFO_FIELD);
 +  GuestLog("VM_ENTRY_INTR_INFO_FIELD entry #: %08x" , v);
    VmxVmcsWrite(VM_ENTRY_INTR_INFO_FIELD, 0);
- 	
+-	
++
    //  ***********************************
    //  *	H.3.3 32-Bit Guest-State Fields *
    //  ***********************************
@@ -437,26 +684,26 @@
 +  GuestLog("== 32 Bit Guest State Fields ==");
 +
 +
-+v = VmxVmcsRead(GUEST_CS_LIMIT);
++  v = VmxVmcsRead(GUEST_CS_LIMIT);
 +  GuestLog("GUEST_CS_LIMIT entry #: %08x" , v);
-+v = VmxVmcsRead(GUEST_SS_LIMIT);
++  v = VmxVmcsRead(GUEST_SS_LIMIT);
 +  GuestLog("GUEST_SS_LIMIT entry #: %08x" , v);
-+v = VmxVmcsRead(GUEST_DS_LIMIT);
++  v = VmxVmcsRead(GUEST_DS_LIMIT);
 +  GuestLog("GUEST_DS_LIMIT entry #: %08x" , v);
 +
-+v = VmxVmcsRead(GUEST_ES_LIMIT);
++  v = VmxVmcsRead(GUEST_ES_LIMIT);
 +  GuestLog("GUEST_ES_LIMIT entry #: %08x" , v);
 +
-+v = VmxVmcsRead(GUEST_FS_LIMIT);
++  v = VmxVmcsRead(GUEST_FS_LIMIT);
 +  GuestLog("GUEST_FS_LIMIT entry #: %08x" , v);
 +
-+v = VmxVmcsRead(GUEST_GS_LIMIT);
++  v = VmxVmcsRead(GUEST_GS_LIMIT);
 +  GuestLog("GUEST_GS_LIMIT entry #: %08x" , v);
 +
-+v = VmxVmcsRead(GUEST_LDTR_LIMIT);
++  v = VmxVmcsRead(GUEST_LDTR_LIMIT);
 +  GuestLog("GUEST_LDTR_LIMIT entry #: %08x" , v);
 +
-+v = VmxVmcsRead(GUEST_TR_LIMIT);
++  v = VmxVmcsRead(GUEST_TR_LIMIT);
 +  GuestLog("GUEST_TR_LIMIT entry #: %08x" , v);
 +
    VmxVmcsWrite(GUEST_CS_LIMIT,   GetSegmentDescriptorLimit(gdt_base, RegGetCs()));
@@ -477,50 +724,50 @@
 +  GuestLog("GUEST TR LIMIT: %.08x\n" , GetSegmentDescriptorLimit(gdt_base, RegGetTr()));
  
    /* Guest GDTR/IDTR limit */
-+v = VmxVmcsRead(GUEST_GDTR_LIMIT);
++  v = VmxVmcsRead(GUEST_GDTR_LIMIT);
 +  GuestLog("GUEST_GDTR_LIMIT entry #: %08x" , v);
    VmxVmcsWrite(GUEST_GDTR_LIMIT, gdt_reg.Limit);
 +  GuestLog("GUEST GDTR LIMIT: %.08x\n" , gdt_reg.Limit);
 +
-+v = VmxVmcsRead(GUEST_IDTR_LIMIT);
++  v = VmxVmcsRead(GUEST_IDTR_LIMIT);
 +  GuestLog("GUEST_IDTR_LIMIT entry #: %08x" , v);
    VmxVmcsWrite(GUEST_IDTR_LIMIT, idt_reg.Limit);
 +  GuestLog("GUEST IDTR LIMIT: %.08x\n" , idt_reg.Limit);
  
    /* DR7 */
-+v = VmxVmcsRead(GUEST_DR7);
++  v = VmxVmcsRead(GUEST_DR7);
 +  GuestLog("GUEST_DR7 entry #: %08x" , v);
    VmxVmcsWrite(GUEST_DR7, 0x400);
 +  GuestLog("GUEST DR7: %.08x\n" , 0x400);
  
    /* Guest interruptibility and activity state */
-+v = VmxVmcsRead(GUEST_INTERRUPTIBILITY_INFO);
++  v = VmxVmcsRead(GUEST_INTERRUPTIBILITY_INFO);
 +  GuestLog("GUEST_INTERRUPTIBILITY_INFO entry #: %08x" , v);
    VmxVmcsWrite(GUEST_INTERRUPTIBILITY_INFO, 0);
 +
-+v = VmxVmcsRead(GUEST_ACTIVITY_STATE);
++  v = VmxVmcsRead(GUEST_ACTIVITY_STATE);
 +  GuestLog("GUEST_ACTIVITY_STATE entry #: %08x" , v);
    VmxVmcsWrite(GUEST_ACTIVITY_STATE, 0);
  
 -  /* Set segment access rights */
 +
-+v = VmxVmcsRead(GUEST_CS_AR_BYTES);
++  v = VmxVmcsRead(GUEST_CS_AR_BYTES);
 +  GuestLog("GUEST_CS_AR_BYTES entry #: %08x" , v);
-+v = VmxVmcsRead(GUEST_DS_AR_BYTES);
++  v = VmxVmcsRead(GUEST_DS_AR_BYTES);
 +  GuestLog("GUEST_DS_AR_BYTES entry #: %08x" , v);
-+v = VmxVmcsRead(GUEST_SS_AR_BYTES);
++  v = VmxVmcsRead(GUEST_SS_AR_BYTES);
 +  GuestLog("GUEST_SS_AR_BYTES entry #: %08x" , v);
-+v = VmxVmcsRead(GUEST_ES_AR_BYTES);
++  v = VmxVmcsRead(GUEST_ES_AR_BYTES);
 +  GuestLog("GUEST_ES_AR_BYTES entry #: %08x" , v);
-+v = VmxVmcsRead(GUEST_FS_AR_BYTES);
++  v = VmxVmcsRead(GUEST_FS_AR_BYTES);
 +  GuestLog("GUEST_FS_AR_BYTES entry #: %08x" , v);
-+v = VmxVmcsRead(GUEST_GS_AR_BYTES);
++  v = VmxVmcsRead(GUEST_GS_AR_BYTES);
 +  GuestLog("GUEST_GS_AR_BYTES entry #: %08x" , v);
-+v = VmxVmcsRead(GUEST_LDTR_AR_BYTES);
++  v = VmxVmcsRead(GUEST_LDTR_AR_BYTES);
 +  GuestLog("GUEST_LDTR_AR_BYTES entry #: %08x" , v);
-+v = VmxVmcsRead(GUEST_TR_AR_BYTES);
++  v = VmxVmcsRead(GUEST_TR_AR_BYTES);
 +  GuestLog("GUEST_TR_AR_BYTES entry #: %08x" , v);
-+ 
++
 +/* Set segment access rights */
    VmxVmcsWrite(GUEST_CS_AR_BYTES,   GetSegmentDescriptorAR(gdt_base, RegGetCs()));
 +  GuestLog("GUEST CS AR BYTES: %.08x\n" , GetSegmentDescriptorAR(gdt_base, RegGetCs()));
@@ -540,13 +787,12 @@
 +  GuestLog("GUEST TR AR BYTES: %.08x\n" , GetSegmentDescriptorAR(gdt_base, RegGetTr()));
  
    /* Guest IA32_SYSENTER_CS */
--  ReadMSR(IA32_SYSENTER_CS, &msr);
 +  
-+v = VmxVmcsRead(GUEST_SYSENTER_CS);
++  v = VmxVmcsRead(GUEST_SYSENTER_CS);
 +  GuestLog("GUEST_SYSENTER_CS entry #: %08x" , v);
 +
 +
-+ReadMSR(IA32_SYSENTER_CS, &msr);
+   ReadMSR(IA32_SYSENTER_CS, &msr);
    VmxVmcsWrite(GUEST_SYSENTER_CS, msr.Lo);
 +  GuestLog("GUEST IA32 SYSENTER CS: %.08x\n" , msr.Lo);
 +
@@ -559,7 +805,7 @@
 +
    /* Guest CR0 */
 +
-+v = VmxVmcsRead(GUEST_CR0);
++  v = VmxVmcsRead(GUEST_CR0);
 +  GuestLog("GUEST_CR0 entry #: %08x" , v);
    temp32 = RegGetCr0();
    CmSetBit32(&temp32, 0);	// PE
@@ -569,7 +815,7 @@
 +  GuestLog("GUEST CR0: %.08x\n" , temp32);
  
    /* Guest CR3 */
-+v = VmxVmcsRead(GUEST_CR3);
++  v = VmxVmcsRead(GUEST_CR3);
 +  GuestLog("GUEST_CR3 entry #: %08x" , v);
    VmxVmcsWrite(GUEST_CR3, RegGetCr3());
 +  GuestLog("GUEST CR3: %.08x\n" , RegGetCr3);
@@ -618,9 +864,9 @@
 +  GuestLog("GUEST TR BASE: %.08x\n" , GetSegmentDescriptorBase(gdt_base, RegGetTr()));
  
    /* Guest GDTR/IDTR base */
-+ v = VmxVmcsRead(GUEST_GDTR_BASE);
++  v = VmxVmcsRead(GUEST_GDTR_BASE);
 +  GuestLog("GUEST_GDTR_BASE entry #: %08x" , v);
-+ v = VmxVmcsRead(GUEST_IDTR_BASE);
++  v = VmxVmcsRead(GUEST_IDTR_BASE);
 +  GuestLog("GUEST_IDTR_BASE entry #: %08x" , v);
 +
    VmxVmcsWrite(GUEST_GDTR_BASE, gdt_reg.BaseLo | (gdt_reg.BaseHi << 16));
@@ -629,27 +875,28 @@
 +  GuestLog("GUEST IDTR BASE: %.08x\n" , idt_reg.BaseLo | (idt_reg.BaseHi << 16));  
    
    /* Guest RFLAGS */
-+ v = VmxVmcsRead(GUEST_RFLAGS);
++  v = VmxVmcsRead(GUEST_RFLAGS);
 +  GuestLog("GUEST_RFLAGS entry #: %08x" , v);
    FLAGS_TO_ULONG(rflags) = RegGetFlags();
    VmxVmcsWrite(GUEST_RFLAGS, FLAGS_TO_ULONG(rflags));
 +  GuestLog("GUEST RFLAGS: %.08x\n" , FLAGS_TO_ULONG(rflags)); 
  
    /* Guest IA32_SYSENTER_ESP */
-+ v = VmxVmcsRead(GUEST_SYSENTER_ESP);
++  v = VmxVmcsRead(GUEST_SYSENTER_ESP);
 +  GuestLog("GUEST_SYSENTER_ESP entry #: %08x" , v);
    ReadMSR(IA32_SYSENTER_ESP, &msr);
    VmxVmcsWrite(GUEST_SYSENTER_ESP, msr.Lo);
 +  GuestLog("GUEST SYSENTER ESP: %.08x\n" , msr.Lo); 
  
    /* Guest IA32_SYSENTER_EIP */
-+ v = VmxVmcsRead(GUEST_SYSENTER_EIP);
++  v = VmxVmcsRead(GUEST_SYSENTER_EIP);
 +  GuestLog("GUEST_SYSENTER_EIP entry #: %08x" , v);
    ReadMSR(IA32_SYSENTER_EIP, &msr);
    VmxVmcsWrite(GUEST_SYSENTER_EIP, msr.Lo);
+-	
 +  GuestLog("GUEST SYSENTER EIP: %.08x\n" , msr.Lo);        
 +
- 	
++
    //	*****************************************
    //	* H.4.4 Natural-Width Host-State Fields *
    //	*****************************************
@@ -657,11 +904,11 @@
 +
 +  GuestLog("== Natural Width Host state Fields ==");
    /* Host CR0, CR3 and CR4 */
-+ v = VmxVmcsRead(HOST_CR0);
++  v = VmxVmcsRead(HOST_CR0);
 +  GuestLog("HOST_CR0 entry #: %08x" , v);
-+ v = VmxVmcsRead(HOST_CR3);
++  v = VmxVmcsRead(HOST_CR3);
 +  GuestLog("HOST_CR3 entry #: %08x" , v);
-+ v = VmxVmcsRead(HOST_CR4);
++  v = VmxVmcsRead(HOST_CR4);
 +  GuestLog("HOST_CR4 entry #: %08x" , v);
 +
    VmxVmcsWrite(HOST_CR0, RegGetCr0() & ~(1 << 16)); /* Disable WP */
@@ -674,11 +921,11 @@
 +  GuestLog("Host CR4: %.08x\n" ,  RegGetCr4());
  
    /* Host FS, GS and TR base */
-+ v = VmxVmcsRead(HOST_FS_BASE);
++  v = VmxVmcsRead(HOST_FS_BASE);
 +  GuestLog("HOST_FS_BASE entry #: %08x" , v);
-+ v = VmxVmcsRead(HOST_GS_BASE);
++  v = VmxVmcsRead(HOST_GS_BASE);
 +  GuestLog("HOST_GS_BASE entry #: %08x" , v);
-+ v = VmxVmcsRead(HOST_TR_BASE);
++  v = VmxVmcsRead(HOST_TR_BASE);
 +  GuestLog("HOST_TR_BASE entry #: %08x" , v);
 +
    VmxVmcsWrite(HOST_FS_BASE, GetSegmentDescriptorBase(gdt_base, RegGetFs()));
@@ -690,9 +937,9 @@
  
    /* Host GDTR/IDTR base (they both hold *linear* addresses) */
 +
-+ v = VmxVmcsRead(HOST_GDTR_BASE);
++  v = VmxVmcsRead(HOST_GDTR_BASE);
 +  GuestLog("HOST_GDTR_BASE entry #: %08x" , v);
-+ v = VmxVmcsRead(HOST_IDTR_BASE);
++  v = VmxVmcsRead(HOST_IDTR_BASE);
 +  GuestLog("HOST_IDTR_BASE entry #: %08x" , v);
 +
    VmxVmcsWrite(HOST_GDTR_BASE, gdt_reg.BaseLo | (gdt_reg.BaseHi << 16));
@@ -701,9 +948,9 @@
 +  GuestLog("HOST IDTR BASE: %.08x\n" , GetSegmentDescriptorBase(gdt_base, RegGetDs()) + (Bit32u) vmxInitState.VMMIDT);
  
    /* Host IA32_SYSENTER_ESP/EIP/CS */
-+ v = VmxVmcsRead(HOST_IA32_SYSENTER_ESP);
++  v = VmxVmcsRead(HOST_IA32_SYSENTER_ESP);
 +  GuestLog("HOST_IA32_SYSENTER_ESP entry #: %08x" , v);
-+ v = VmxVmcsRead(HOST_IA32_SYSENTER_EIP);
++  v = VmxVmcsRead(HOST_IA32_SYSENTER_EIP);
 +  GuestLog("HOST_IA32_SYSENTER_EIP entry #: %08x" , v);
    ReadMSR(IA32_SYSENTER_ESP, &msr);
 -  VmxVmcsWrite(HOST_IA32_SYSENTER_ESP, msr.Lo);
@@ -713,9 +960,9 @@
    ReadMSR(IA32_SYSENTER_EIP, &msr);
    VmxVmcsWrite(HOST_IA32_SYSENTER_EIP, msr.Lo);
 +  GuestLog("Host IA32 SYSENTER EIP: %.08x\n" , msr.Lo);
-+
  
-+ v = VmxVmcsRead(HOST_IA32_SYSENTER_CS);
++
++  v = VmxVmcsRead(HOST_IA32_SYSENTER_CS);
 +  GuestLog("HOST_IA32_SYSENTER_CS entry #: %08x" , v);
    ReadMSR(IA32_SYSENTER_CS, &msr);
    VmxVmcsWrite(HOST_IA32_SYSENTER_CS, msr.Lo);
@@ -724,67 +971,83 @@
  
    // (5) Issue a sequence of VMWRITEs to initialize various host-state area
    //	 fields in the working VMCS. The initialization sets up the context
-@@ -496,104 +978,173 @@
+@@ -484,7 +973,7 @@ static hvm_status VmxVmcsInitialize(hvm_address guest_stack, hvm_address guest_r
+   //	 by the VMX capability MSRs (see Appendix G). Any settings inconsistent
+   //	 with the settings reported by the capability MSRs will cause VM
+   //	 entries to fail.
+-	
++
+   // (7) Use VMWRITE to initialize various guest-state area fields in the
+   //	 working VMCS. This sets up the context and entry-point for guest
+   //	 execution upon VM entry. Chapter 22 describes the guest-state loading
+@@ -496,120 +985,195 @@ static hvm_status VmxVmcsInitialize(hvm_address guest_stack, hvm_address guest_r
    Log("Clearing VMX abort error code: %.8x", *(vmxInitState.pVMCSRegion + 4));
  
    /* Set RIP, RSP for the Guest right before calling VMLAUNCH */
-+ v = VmxVmcsRead(GUEST_RSP);
++  v = VmxVmcsRead(GUEST_RSP);
 +  GuestLog("GUEST_RSP entry #: %08x" , v);
-+ v = VmxVmcsRead(GUEST_RIP);
++  v = VmxVmcsRead(GUEST_RIP);
 +  GuestLog("GUEST_RIP entry #: %08x" , v);
 +
    Log("Setting Guest RSP to %.8x", guest_stack);
    VmxVmcsWrite(GUEST_RSP, (hvm_address) guest_stack);
+-	
 +  GuestLog("Guest RSP: %.8x", guest_stack);
- 	
++
    Log("Setting Guest RIP to %.8x", guest_return);
    VmxVmcsWrite(GUEST_RIP, (hvm_address) guest_return);
  
--  /* Set RIP, RSP for the Host right before calling VMLAUNCH */
 +
-+ v = VmxVmcsRead(HOST_RSP);
++  v = VmxVmcsRead(HOST_RSP);
 +  GuestLog("HOST_RSP entry #: %08x" , v);
-+ v = VmxVmcsRead(HOST_RIP);
++  v = VmxVmcsRead(HOST_RIP);
 +  GuestLog("HOST_RIP entry #: %08x" , v);
 +
-+ v = VmxVmcsRead(0x201a);
++  v = VmxVmcsRead(0x201a);
 +  GuestLog("EPT_POINTER_FULL entry #: %08x" , v);
 +
-+ v = VmxVmcsRead(0x201b);
++  v = VmxVmcsRead(0x201b);
 +  GuestLog("EPT_POINTER_HIGH entry #: %08x" , v);
 +
-+ v = VmxVmcsRead(0x280a);
++  v = VmxVmcsRead(0x280a);
 +  GuestLog("PDPTE0_FULL entry #: %08x" , v);
 +
-+ v = VmxVmcsRead(0x280b);
++  v = VmxVmcsRead(0x280b);
 +  GuestLog("PDPTE0_HIGH entry #: %08x" , v);
 +
-+ v = VmxVmcsRead(0x280c);
++  v = VmxVmcsRead(0x280c);
 +  GuestLog("PDPTE1_FULL entry #: %08x" , v);
 +
-+ v = VmxVmcsRead(0x280d);
++  v = VmxVmcsRead(0x280d);
 +  GuestLog("PDPTE1_HIGH entry #: %08x" , v);
 +
-+ v = VmxVmcsRead(0x280e);
++  v = VmxVmcsRead(0x280e);
 +  GuestLog("PDPTE2_FULL entry #: %08x" , v);
 +
-+ v = VmxVmcsRead(0x280f);
++  v = VmxVmcsRead(0x280f);
 +  GuestLog("PDPTE2_HIGH entry #: %08x" , v);
 +
-+
-+ v = VmxVmcsRead(0x2810);
++  v = VmxVmcsRead(0x2810);
 +  GuestLog("PDPTE3_FULL entry #: %08x" , v);
 +
-+ v = VmxVmcsRead(0x2811);
++  v = VmxVmcsRead(0x2811);
 +  GuestLog("PDPTE3_HIGH entry #: %08x" , v);
 +
-+ v = VmxVmcsRead(0x0000);
++  v = VmxVmcsRead(0x0000);
 +  GuestLog("VPID entry #: %08x" , v);
 +
++  /* Host and GUEST IA32_EFER */
++  v = VmxVmcsRead(HOST_IA32_EFER_FULL);
++  GuestLog("HOST_IA32_EFER_FULL entry #: %08x", v);
++  v = VmxVmcsRead(HOST_IA32_EFER_HIGH);
++  GuestLog("HOST_IA32_EFER_HIGH entry #: %08x", v);
 +
++  v = VmxVmcsRead(GUEST_IA32_EFER_FULL);
++  GuestLog("GUEST_IA32_EFER_FULL entry #: %08x", v);
++  v = VmxVmcsRead(GUEST_IA32_EFER_HIGH);
++  GuestLog("GUEST_IA32_EFER_HIGH entry #: %08x", v);
 +
-+
-+	  /* Set RIP, RSP for the Host right before calling VMLAUNCH */
+   /* Set RIP, RSP for the Host right before calling VMLAUNCH */
    Log("Setting Host RSP to %.8x", ((hvm_address) vmxInitState.VMMStack + VMM_STACK_SIZE - 1));
    VmxVmcsWrite(HOST_RSP, ((hvm_address) vmxInitState.VMMStack + VMM_STACK_SIZE - 1));
 +  GuestLog("Host RSP: %.8x", ((hvm_address) vmxInitState.VMMStack + VMM_STACK_SIZE - 1));
@@ -877,13 +1140,11 @@
 -    }
 +  GuestLog("VMA of VMCS region: %08x" ,  vmxInitState.pVMCSRegion);            /* VMA of VMCS region */
 +  GuestLog("PMA of VMCS region: %08x" , vmxInitState.PhysicalVMCSRegionPtr);  /* PMA of VMCS region */
-+
-+
-+  return HVM_STATUS_SUCCESS;
-+}
  
 -  /* Allocate a memory page for the I/O bitmap B */
 -  vmxInitState.pIOBitmapB = GUEST_MALLOC(4096);
++  return HVM_STATUS_UNSUCCESSFUL;
++}
  
 -  if(vmxInitState.pIOBitmapB == NULL) {
 -    GuestLog("ERROR: Allocating I/O bitmap A memory");
@@ -892,93 +1153,173 @@
 -  vmm_memset(vmxInitState.pIOBitmapB, 0, 4096);
  
 -  r = MmuGetPhysicalAddress(cr3, (hvm_address) vmxInitState.pIOBitmapB , &vmxInitState.PhysicalIOBitmapB);
-+	static hvm_status VmxInitialize(void (*idt_initializer)(PIDT_ENTRY pidt))
-+	{
-+	  hvm_status r;
-+	  hvm_address cr3;
+-  if (r != HVM_STATUS_SUCCESS)
+-    {
+-      GuestLog("ERROR: Can't determine physical address for I/O bitmap B");
+-      return HVM_STATUS_UNSUCCESSFUL;
+-    }
++
++static hvm_status VmxInitialize(void (*idt_initializer)(PIDT_ENTRY pidt))
++{
++ hvm_status r;
++ hvm_address cr3;
 +	#ifdef GUEST_LINUX
-+	  mempool_t* pool;
++ mempool_t* pool;
 +	#endif
 +
-+	  cr3 = RegGetCr3();
-+	  
++ cr3 = RegGetCr3();
++
 +	  /* Allocate the VMXON region memory */
-+	  vmxInitState.pVMXONRegion = (Bit32u*) GUEST_MALLOC(4096);
-+	  
-+	  if(vmxInitState.pVMXONRegion == NULL) {
-+	    GuestLog("ERROR: Allocating VMXON region memory");
-+	    return HVM_STATUS_UNSUCCESSFUL;
-+	  }
-+	  vmm_memset(vmxInitState.pVMXONRegion, 0, 4096);
-+	  
-+	  r = MmuGetPhysicalAddress(cr3, (hvm_address) vmxInitState.pVMXONRegion, &vmxInitState.PhysicalVMXONRegionPtr);
-+	  if (r != HVM_STATUS_SUCCESS) {
-+	    GuestLog("ERROR: Can't determine physical address for VMXON region");
-+	    return HVM_STATUS_UNSUCCESSFUL;
-+	  }
++ vmxInitState.pVMXONRegion = (Bit32u*) GUEST_MALLOC(4096);
++
++ if(vmxInitState.pVMXONRegion == NULL) {
++   GuestLog("ERROR: Allocating VMXON region memory");
++   return HVM_STATUS_UNSUCCESSFUL;
++ }
++ vmm_memset(vmxInitState.pVMXONRegion, 0, 4096);
++
++ r = MmuGetPhysicalAddress(cr3, (hvm_address) vmxInitState.pVMXONRegion, &vmxInitState.PhysicalVMXONRegionPtr);
++ if (r != HVM_STATUS_SUCCESS) {
++   GuestLog("ERROR: Can't determine physical address for VMXON region");
++   return HVM_STATUS_UNSUCCESSFUL;
++ }
 +
 +	  /* Allocate the VMCS region memory */
-+	  vmxInitState.pVMCSRegion = (Bit32u*) GUEST_MALLOC(4096);    
-+	    
-+	  if(vmxInitState.pVMCSRegion == NULL) {
-+	    GuestLog("ERROR: Allocating VMCS region memory");
-+	    return HVM_STATUS_UNSUCCESSFUL;
-+	  }
-+	  vmm_memset(vmxInitState.pVMCSRegion, 0, 4096);
-+	  
-+	  r = MmuGetPhysicalAddress(cr3, (hvm_address) vmxInitState.pVMCSRegion, &vmxInitState.PhysicalVMCSRegionPtr);
-+	  if (r != HVM_STATUS_SUCCESS) {
-+	    GuestLog("ERROR: Can't determine physical address for VMCS region");
-+	    return HVM_STATUS_UNSUCCESSFUL;
-+	  }
-+	  
++ vmxInitState.pVMCSRegion = (Bit32u*) GUEST_MALLOC(4096);    
++
++ if(vmxInitState.pVMCSRegion == NULL) {
++   GuestLog("ERROR: Allocating VMCS region memory");
++   return HVM_STATUS_UNSUCCESSFUL;
++ }
++ vmm_memset(vmxInitState.pVMCSRegion, 0, 4096);
++
++ r = MmuGetPhysicalAddress(cr3, (hvm_address) vmxInitState.pVMCSRegion, &vmxInitState.PhysicalVMCSRegionPtr);
++ if (r != HVM_STATUS_SUCCESS) {
++   GuestLog("ERROR: Can't determine physical address for VMCS region");
++   return HVM_STATUS_UNSUCCESSFUL;
++ }
++
 +	  /* Allocate stack for the VM exit handler */
 +	#ifdef GUEST_WINDOWS
-+	  vmxInitState.VMMStack = ExAllocatePoolWithTag(NonPagedPool, VMM_STACK_SIZE, 'gbdh');
++ vmxInitState.VMMStack = ExAllocatePoolWithTag(NonPagedPool, VMM_STACK_SIZE, 'gbdh');
 +	#elif defined GUEST_LINUX
-+	  pool = mempool_create_kmalloc_pool(1,VMM_STACK_SIZE);
-+	  vmxInitState.VMMStack = mempool_alloc(pool,GFP_KERNEL);
++ pool = mempool_create_kmalloc_pool(1,VMM_STACK_SIZE);
++ vmxInitState.VMMStack = mempool_alloc(pool,GFP_KERNEL);
 +	#endif
-+	  
-+	  if(vmxInitState.VMMStack == NULL) {
-+	    GuestLog("ERROR: Allocating VM exit handler stack memory");
-+	    return HVM_STATUS_UNSUCCESSFUL;
-+	  }
-+	  vmm_memset(vmxInitState.VMMStack, 0, VMM_STACK_SIZE);
 +
-+	 
++ if(vmxInitState.VMMStack == NULL) {
++   GuestLog("ERROR: Allocating VM exit handler stack memory");
++   return HVM_STATUS_UNSUCCESSFUL;
++ }
++ vmm_memset(vmxInitState.VMMStack, 0, VMM_STACK_SIZE);
++
++
 +	  /* Allocate a memory page for the I/O bitmap A */
-+	  vmxInitState.pIOBitmapA = GUEST_MALLOC(4096);
-+	  
-+	  if(vmxInitState.pIOBitmapA == NULL) {
-+	    GuestLog("ERROR: Allocating I/O bitmap A memory");
-+	    return HVM_STATUS_UNSUCCESSFUL;
-+	  }
-+	  vmm_memset(vmxInitState.pIOBitmapA, 0, 4096);
-+	 
-+          GuestLog("OS CR3: %08x" , cr3); 
-+	  r = MmuGetPhysicalAddress(cr3, (hvm_address) vmxInitState.pIOBitmapA, &vmxInitState.PhysicalIOBitmapA);
-+	  
-+	  if (r != HVM_STATUS_SUCCESS)
-+	    {
-+	      GuestLog("ERROR: Can't determine physical address for I/O bitmap A");
-+	      return HVM_STATUS_UNSUCCESSFUL;
-+	    }
++ vmxInitState.pIOBitmapA = GUEST_MALLOC(4096);
++
++ if(vmxInitState.pIOBitmapA == NULL) {
++   GuestLog("ERROR: Allocating I/O bitmap A memory");
++   return HVM_STATUS_UNSUCCESSFUL;
++ }
++ vmm_memset(vmxInitState.pIOBitmapA, 0, 4096);
++
++ GuestLog("OS CR3: %08x" , cr3); 
++ r = MmuGetPhysicalAddress(cr3, (hvm_address) vmxInitState.pIOBitmapA, &vmxInitState.PhysicalIOBitmapA);
++
++ if (r != HVM_STATUS_SUCCESS)
++ {
++   GuestLog("ERROR: Can't determine physical address for I/O bitmap A");
++   return HVM_STATUS_UNSUCCESSFUL;
++ }
 +
 +	  /* Allocate a memory page for the I/O bitmap B */
-+	  vmxInitState.pIOBitmapB = GUEST_MALLOC(4096);
++ vmxInitState.pIOBitmapB = GUEST_MALLOC(4096);
 +
-+	  if(vmxInitState.pIOBitmapB == NULL) {
-+	    GuestLog("ERROR: Allocating I/O bitmap A memory");
-+	    return HVM_STATUS_UNSUCCESSFUL;
-+	  }
-+	  vmm_memset(vmxInitState.pIOBitmapB, 0, 4096);
++ if(vmxInitState.pIOBitmapB == NULL) {
++   GuestLog("ERROR: Allocating I/O bitmap A memory");
++   return HVM_STATUS_UNSUCCESSFUL;
++ }
++ vmm_memset(vmxInitState.pIOBitmapB, 0, 4096);
 +
-+		  r = MmuGetPhysicalAddress(cr3, (hvm_address) vmxInitState.pIOBitmapB , &vmxInitState.PhysicalIOBitmapB);
-   if (r != HVM_STATUS_SUCCESS)
-     {
-       GuestLog("ERROR: Can't determine physical address for I/O bitmap B");
-@@ -706,7 +1257,7 @@
++ r = MmuGetPhysicalAddress(cr3, (hvm_address) vmxInitState.pIOBitmapB , &vmxInitState.PhysicalIOBitmapB);
++ if (r != HVM_STATUS_SUCCESS)
++ {
++  GuestLog("ERROR: Can't determine physical address for I/O bitmap B");
++  return HVM_STATUS_UNSUCCESSFUL;
++}
+ 
+   /* Allocate & initialize the IDT for the VMM */
+-  vmxInitState.VMMIDT = GUEST_MALLOC(sizeof(IDT_ENTRY)*256);
+- 
+-  if (vmxInitState.VMMIDT == NULL) {
+-    GuestLog("ERROR: Allocating VMM interrupt descriptor table");
+-    return HVM_STATUS_UNSUCCESSFUL;
+-  }
+-  idt_initializer(vmxInitState.VMMIDT);
++vmxInitState.VMMIDT = GUEST_MALLOC(sizeof(IDT_ENTRY)*256);
+ 
+-  return HVM_STATUS_SUCCESS;
++if (vmxInitState.VMMIDT == NULL) {
++  GuestLog("ERROR: Allocating VMM interrupt descriptor table");
++  return HVM_STATUS_UNSUCCESSFUL;
++}
++idt_initializer(vmxInitState.VMMIDT);
++
++return HVM_STATUS_SUCCESS;
+ }
+ 
+ static hvm_status VmxFinalize(void)
+@@ -643,15 +1207,15 @@ static hvm_bool VmxHasCPUSupport(void)
+   VMX_FEATURES vmxFeatures;
+ 
+   __asm__ __volatile__ (
+-			"pushal\n"
+-			"movl $0x1,%%eax\n"
+-			"cpuid\n"
++   "pushal\n"
++   "movl $0x1,%%eax\n"
++   "cpuid\n"
+ 			// ecx contains the vmx_features flags (vmx supported if bit 5 equals 1)
+-			"movl %%ecx,%0\n"
+-			"popal\n"
+-			:"=m"(vmxFeatures)
+-			::"memory"
+-			);
++   "movl %%ecx,%0\n"
++   "popal\n"
++   :"=m"(vmxFeatures)
++   ::"memory"
++   );
+ 
+   return (vmxFeatures.VMX != 0);
+ }
+@@ -669,7 +1233,7 @@ static hvm_status VmxHardwareEnable(void)
+     GuestLog("VMX support not present");
+     return HVM_STATUS_UNSUCCESSFUL;
+   }
+-	
++
+   GuestLog("VMX support present");
+ 
+   // (2) Determine the VMX capabilities supported by the processor through
+@@ -691,13 +1255,13 @@ static hvm_status VmxHardwareEnable(void)
+   GuestLog("      [7-15]  --> Unused");
+ 
+   switch(vmxBasicMsr.MemType) {
+-  case VMX_MEMTYPE_UNCACHEABLE:
++    case VMX_MEMTYPE_UNCACHEABLE:
+     GuestLog("Unsupported memory type %.8x", vmxBasicMsr.MemType);
+     return HVM_STATUS_UNSUCCESSFUL;
+     break;
+-  case VMX_MEMTYPE_WRITEBACK:
++    case VMX_MEMTYPE_WRITEBACK:
+     break;
+-  default:
++    default:
+     GuestLog("ERROR: Unknown VMXON region memory type");
+     return HVM_STATUS_UNSUCCESSFUL;
+     break;
+@@ -706,7 +1270,7 @@ static hvm_status VmxHardwareEnable(void)
    // (4) Initialize the version identifier in the VMXON region (first 32 bits)
    //	 with the VMCS revision identifier reported by capability MSRs.
    *(vmxInitState.pVMXONRegion) = vmxBasicMsr.RevId;
@@ -987,20 +1328,512 @@
    GuestLog("vmxBasicMsr.RevId: %.8x", vmxBasicMsr.RevId);
    
    // (5) Ensure the current processor operating mode meets the required CR0
-@@ -772,7 +1323,7 @@
+@@ -728,7 +1292,7 @@ static hvm_status VmxHardwareEnable(void)
+     GuestLog("Value of CR0: %.8x", CR0_TO_ULONG(cr0_reg));
+     return HVM_STATUS_UNSUCCESSFUL;
+   }
+-	
++
+   GuestLog("Paging enabled");
+ 
+   // This was required by first processors that supported VMX	
+@@ -752,7 +1316,7 @@ static hvm_status VmxHardwareEnable(void)
+   //	 enabled (bit 2=1). This MSR is generally configured by the BIOS using 
+   //	 WRMSR. If it's not set, it's safe for us to set it.
+   GuestLog("IA32_FEATURE_CONTROL Lock Bit: %.8x, EnableVmx bit %.8x", vmxFeatureControl.Lock, vmxFeatureControl.EnableVmxon);
+-	
++
+   if(vmxFeatureControl.Lock != 1) {
+     // MSR hasn't been locked, we can enable VMX and lock it
+     GuestLog("Setting IA32_FEATURE_CONTROL Lock Bit and Vmxon Enable bit");
+@@ -772,7 +1336,6 @@ static hvm_status VmxHardwareEnable(void)
    // (8) Execute VMXON with the physical address of the VMXON region as the
    //	 operand. Check successful execution of VMXON by checking if
    //	 RFLAGS.CF=0.
 -
-+  DriverUnload();
    FLAGS_TO_ULONG(rflags) = VmxTurnOn(GET32H(vmxInitState.PhysicalVMXONRegionPtr), GET32L(vmxInitState.PhysicalVMXONRegionPtr));
  
    if(rflags.CF == 1) {
-@@ -899,6 +1450,7 @@
-   EventUpdateExceptionBitmap(&temp32);
+@@ -783,9 +1346,9 @@ static hvm_status VmxHardwareEnable(void)
+   /* VMXON was successful, so we cannot use GuestLog() anymore */
+   vmxIsActive = TRUE;
+ 
+-  Log("SUCCESS: VMXON operation completed");
+-  Log("VMM is now running");
+-	
++  GuestLog("SUCCESS: VMXON operation completed");
++  GuestLog("VMM is now running");
++
+   return HVM_STATUS_SUCCESS;
+ }
+ 
+@@ -835,9 +1398,9 @@ static Bit32u VmxGetExitInstructionLength(void)
+ static void VmxInvalidateTLB(void)
+ {
+   __asm__ __volatile__ ( 
+-			"movl %cr3,%eax\n"
+-			"movl %eax,%cr3\n"
+-			 );
++   "movl %cr3,%eax\n"
++   "movl %eax,%cr3\n"
++   );
+ }
+ 
+ Bit32u VmxAdjustControls(Bit32u c, Bit32u n)
+@@ -861,44 +1424,45 @@ Bit32u VmxAdjustControls(Bit32u c, Bit32u n)
+ 
+    NOTE: general purpose registers are not stored into the VMCS, so they are
+    saved at the very beginning of the VmxEntryPoint() procedure */
+-static void VmxReadGuestContext(void)
+-{
++   static void VmxReadGuestContext(void)
++   {
+   /* Exit state */
+-  vmxcontext.ExitReason                   = VmxRead(VM_EXIT_REASON);
+-  vmxcontext.ExitQualification            = VmxRead(EXIT_QUALIFICATION);
+-  vmxcontext.ExitInterruptionInformation  = VmxRead(VM_EXIT_INTR_INFO);
+-  vmxcontext.ExitInterruptionErrorCode    = VmxRead(VM_EXIT_INTR_ERROR_CODE);
+-  vmxcontext.IDTVectoringInformationField = VmxRead(IDT_VECTORING_INFO_FIELD);
+-  vmxcontext.IDTVectoringErrorCode        = VmxRead(IDT_VECTORING_ERROR_CODE);
+-  vmxcontext.ExitInstructionLength        = VmxRead(VM_EXIT_INSTRUCTION_LEN);
+-  vmxcontext.ExitInstructionInformation   = VmxRead(VMX_INSTRUCTION_INFO);
++    vmxcontext.ExitReason                   = VmxRead(VM_EXIT_REASON);
++    vmxcontext.ExitQualification            = VmxRead(EXIT_QUALIFICATION);
++    vmxcontext.ExitInterruptionInformation  = VmxRead(VM_EXIT_INTR_INFO);
++    vmxcontext.ExitInterruptionErrorCode    = VmxRead(VM_EXIT_INTR_ERROR_CODE);
++    vmxcontext.IDTVectoringInformationField = VmxRead(IDT_VECTORING_INFO_FIELD);
++    vmxcontext.IDTVectoringErrorCode        = VmxRead(IDT_VECTORING_ERROR_CODE);
++    vmxcontext.ExitInstructionLength        = VmxRead(VM_EXIT_INSTRUCTION_LEN);
++    vmxcontext.ExitInstructionInformation   = VmxRead(VMX_INSTRUCTION_INFO);
+ 
+   /* Read guest state */
+-  context.GuestContext.rip    = VmxRead(GUEST_RIP);
+-  context.GuestContext.rsp    = VmxRead(GUEST_RSP);
+-  context.GuestContext.cs     = VmxRead(GUEST_CS_SELECTOR);
+-  context.GuestContext.cr0    = VmxRead(GUEST_CR0);
+-  context.GuestContext.cr3    = VmxRead(GUEST_CR3);
+-  context.GuestContext.cr4    = VmxRead(GUEST_CR4);
+-  context.GuestContext.rflags = VmxRead(GUEST_RFLAGS);
++    context.GuestContext.rip    = VmxRead(GUEST_RIP);
++    context.GuestContext.rsp    = VmxRead(GUEST_RSP);
++    context.GuestContext.cs     = VmxRead(GUEST_CS_SELECTOR);
++    context.GuestContext.cr0    = VmxRead(GUEST_CR0);
++    context.GuestContext.cr3    = VmxRead(GUEST_CR3);
++    context.GuestContext.cr4    = VmxRead(GUEST_CR4);
++    context.GuestContext.rflags = VmxRead(GUEST_RFLAGS);
+ 
+   /* Writing the Guest VMCS RIP uses general registers. Must complete this
+      before setting general registers for guest return state */
+-  context.GuestContext.resumerip = context.GuestContext.rip + vmxcontext.ExitInstructionLength;
+-}
++    context.GuestContext.resumerip = context.GuestContext.rip + vmxcontext.ExitInstructionLength;
++  }
+ 
+-static hvm_status VmxHvmUpdateEvents(void)
+-{
+-  Bit32u temp32;
++  static hvm_status VmxHvmUpdateEvents(void)
++  {
++    Bit32u temp32;
+ 
+   /* I/O bitmap */
+-  EventUpdateIOBitmaps((Bit8u*) vmxInitState.pIOBitmapA, (Bit8u*) vmxInitState.pIOBitmapB);
++    EventUpdateIOBitmaps((Bit8u*) vmxInitState.pIOBitmapA, (Bit8u*) vmxInitState.pIOBitmapB);
+ 
+   /* Exception bitmap */
+-  temp32 = 0;
+-  EventUpdateExceptionBitmap(&temp32);
++    temp32 = 0;
++    EventUpdateExceptionBitmap(&temp32);
    CmSetBit32(&temp32, TRAP_DEBUG);   // DO NOT DISABLE: needed to step over I/O instructions!!!
    VmxVmcsWrite(EXCEPTION_BITMAP, temp32);
 +  GuestLog("Exception Bitmap: %08x" , temp32);
  
    return HVM_STATUS_SUCCESS;
  }
+@@ -936,57 +1500,57 @@ static hvm_status VmxHvmSwitchOff(void)
+   RegSetIdtr((void*) VmxRead(GUEST_IDTR_BASE), VmxRead(GUEST_IDTR_LIMIT));
+   
+   __asm__ __volatile__ (
+-			"pushl  %%eax\n"
++   "pushl  %%eax\n"
+   			/* Restore guest CR0 */
+-  			"movl	%0,%%eax\n"
+-  			"movl	%%eax,%%cr0\n"
++   "movl	%0,%%eax\n"
++   "movl	%%eax,%%cr0\n"
+ 
+   			/* Restore guest CR3 */
+-  			"movl	%1,%%eax\n"
+-  			"movl	%%eax,%%cr3\n"
++   "movl	%1,%%eax\n"
++   "movl	%%eax,%%cr3\n"
+ 
+   			/* Restore guest CR4 */
+-  			"movl	%2,%%eax\n"
+-			
++   "movl	%2,%%eax\n"
++
+   			/* movl %eax, %cr4; */
+-  			".byte 0x0f\n"
+-  			".byte 0x22\n"
+-  			".byte 0xe0\n"
++   ".byte 0x0f\n"
++   ".byte 0x22\n"
++   ".byte 0xe0\n"
+ 
+-		        "popl  %%eax\n"
+-  			::"m"(context.GuestContext.cr0),"m"(context.GuestContext.cr3),"m"(context.GuestContext.cr4)
+-  			);
++   "popl  %%eax\n"
++   ::"m"(context.GuestContext.cr0),"m"(context.GuestContext.cr3),"m"(context.GuestContext.cr4)
++   );
+   /* Turn off VMX */
+   VmxTurnOff();
+   vmxIsActive = FALSE;
+ 
+   __asm__ __volatile__(
+ 		       /* Restore general-purpose registers */
+-		       "movl	%0,%%eax\n"
+-		       "movl	%1,%%ebx\n"
+-		       "movl	%2,%%ecx\n"
+-		       "movl	%3,%%edx\n"
+-		       "movl	%4,%%edi\n"
+-		       "movl	%5,%%esi\n"
+-		       "movl	%6,%%ebp\n"
++   "movl	%0,%%eax\n"
++   "movl	%1,%%ebx\n"
++   "movl	%2,%%ecx\n"
++   "movl	%3,%%edx\n"
++   "movl	%4,%%edi\n"
++   "movl	%5,%%esi\n"
++   "movl	%6,%%ebp\n"
+ 
+ 		       /* Restore ESP */
+-		       "movl	%7,%%esp\n"
++   "movl	%7,%%esp\n"
+ 
+ 		       /* Restore guest RFLAGS */
+-		       "pushl	%%eax\n"
+-		       "movl	%8,%%eax\n"
+-		       "pushl	%%eax\n"
+-		       "popfl\n"
+-		       "popl	%%eax\n"
++   "pushl	%%eax\n"
++   "movl	%8,%%eax\n"
++   "pushl	%%eax\n"
++   "popfl\n"
++   "popl	%%eax\n"
+ 
+ 		       /* Resume guest execution */
+-		       "jmp	*%9\n"
+-		       ::"m"(context.GuestContext.rax), "m"(context.GuestContext.rbx), "m"(context.GuestContext.rcx),    \
+-			 "m"(context.GuestContext.rdx), "m"(context.GuestContext.rdi), "m"(context.GuestContext.rsi),    \
+-			 "m"(context.GuestContext.rbp), "m"(context.GuestContext.rsp), "m"(context.GuestContext.rflags), \
+-			 "m"(context.GuestContext.resumerip)
+-		       );
++   "jmp	*%9\n"
++   ::"m"(context.GuestContext.rax), "m"(context.GuestContext.rbx), "m"(context.GuestContext.rcx),    \
++   "m"(context.GuestContext.rdx), "m"(context.GuestContext.rdi), "m"(context.GuestContext.rsi),    \
++   "m"(context.GuestContext.rbp), "m"(context.GuestContext.rsp), "m"(context.GuestContext.rflags), \
++   "m"(context.GuestContext.resumerip)
++   );
+ 
+   /* Unreachable */
+   return STATUS_SUCCESS;
+@@ -1006,17 +1570,17 @@ static void VmxInternalHandleCR(void)
+ 
+   /* Read access type */
+   switch (movcrAccessType) {
+-  case 0:
++    case 0:
+     accesstype = VT_CR_ACCESS_WRITE;
+     break;
+-  case 1:
+-  default: 
++    case 1:
++    default: 
+     accesstype = VT_CR_ACCESS_READ; 
+     break;
+-  case 2: 
++    case 2: 
+     accesstype = VT_CR_ACCESS_CLTS;  
+     break;
+-  case 3: 
++    case 3: 
+     accesstype = VT_CR_ACCESS_LMSW;  
+     break;
+   }
+@@ -1024,23 +1588,23 @@ static void VmxInternalHandleCR(void)
+   /* Read general purpose register */
+   if (movcrOperandType == 1 && accesstype != VT_CR_ACCESS_CLTS && accesstype != VT_CR_ACCESS_LMSW) {
+     switch (movcrGeneralPurposeRegister) {
+-    case 0:  gpr = VT_REGISTER_RAX; break;
+-    case 1:  gpr = VT_REGISTER_RCX; break;
+-    case 2:  gpr = VT_REGISTER_RDX; break;
+-    case 3:  gpr = VT_REGISTER_RBX; break;
+-    case 4:  gpr = VT_REGISTER_RSP; break;
+-    case 5:  gpr = VT_REGISTER_RBP; break;
+-    case 6:  gpr = VT_REGISTER_RSI; break;
+-    case 7:  gpr = VT_REGISTER_RDI; break;
+-    case 8:  gpr = VT_REGISTER_R8;  break;
+-    case 9:  gpr = VT_REGISTER_R9;  break;
+-    case 10: gpr = VT_REGISTER_R10; break;
+-    case 11: gpr = VT_REGISTER_R11; break;
+-    case 12: gpr = VT_REGISTER_R12; break;
+-    case 13: gpr = VT_REGISTER_R13; break;
+-    case 14: gpr = VT_REGISTER_R14; break;
+-    case 15: gpr = VT_REGISTER_R15; break;
+-    default: gpr = 0;               break;
++      case 0:  gpr = VT_REGISTER_RAX; break;
++      case 1:  gpr = VT_REGISTER_RCX; break;
++      case 2:  gpr = VT_REGISTER_RDX; break;
++      case 3:  gpr = VT_REGISTER_RBX; break;
++      case 4:  gpr = VT_REGISTER_RSP; break;
++      case 5:  gpr = VT_REGISTER_RBP; break;
++      case 6:  gpr = VT_REGISTER_RSI; break;
++      case 7:  gpr = VT_REGISTER_RDI; break;
++      case 8:  gpr = VT_REGISTER_R8;  break;
++      case 9:  gpr = VT_REGISTER_R9;  break;
++      case 10: gpr = VT_REGISTER_R10; break;
++      case 11: gpr = VT_REGISTER_R11; break;
++      case 12: gpr = VT_REGISTER_R12; break;
++      case 13: gpr = VT_REGISTER_R13; break;
++      case 14: gpr = VT_REGISTER_R14; break;
++      case 15: gpr = VT_REGISTER_R15; break;
++      default: gpr = 0;               break;
+     }
+   } else {
+     gpr = 0;
+@@ -1072,7 +1636,7 @@ static void VmxInternalHandleIO(void)
+ 	   size,		/* I/O operation size */
+ 	   isstring,		/* Is this a string operation? */
+ 	   isrep		/* Does this instruction have a REP prefix? */
+-	   );
++  );
+ }
+ 
+ static void VmxInternalHandleNMI(void)
+@@ -1084,11 +1648,11 @@ static void VmxInternalHandleNMI(void)
+   /* Check if bits 11 (deliver code) and 31 (valid) are set. In this
+      case, error code has to be delivered to guest OS */
+   if ((vmxcontext.ExitInterruptionInformation & INTR_INFO_DELIVER_CODE_MASK) &&
+-      (vmxcontext.ExitInterruptionInformation & INTR_INFO_VALID_MASK)) {
++    (vmxcontext.ExitInterruptionInformation & INTR_INFO_VALID_MASK)) {
+     error_code = vmxcontext.ExitInterruptionErrorCode;
+-  } else {
+-    error_code = HVM_DELIVER_NO_ERROR_CODE;
+-  }
++} else {
++  error_code = HVM_DELIVER_NO_ERROR_CODE;
++}
+ 
+   HandleNMI(trap, 		         /* Trap number */
+ 	    error_code,			 /* Exception error code */
+@@ -1151,14 +1715,14 @@ void VmxHvmInternalHandleExit(void)
+     /////////////////////////////////////////////////////////////////////////////////////
+     //  VMCLEAR, VMLAUNCH, VMPTRLD, VMPTRST, VMREAD, VMWRITE, VMRESUME, VMXOFF, VMXON  //
+     /////////////////////////////////////////////////////////////////////////////////////
+-  case EXIT_REASON_VMCLEAR:
+-  case EXIT_REASON_VMPTRLD: 
+-  case EXIT_REASON_VMPTRST: 
+-  case EXIT_REASON_VMREAD:  
+-  case EXIT_REASON_VMRESUME:
+-  case EXIT_REASON_VMWRITE:
+-  case EXIT_REASON_VMXOFF:
+-  case EXIT_REASON_VMXON:
++    case EXIT_REASON_VMCLEAR:
++    case EXIT_REASON_VMPTRLD: 
++    case EXIT_REASON_VMPTRST: 
++    case EXIT_REASON_VMREAD:  
++    case EXIT_REASON_VMRESUME:
++    case EXIT_REASON_VMWRITE:
++    case EXIT_REASON_VMXOFF:
++    case EXIT_REASON_VMXON:
+     Log("Request has been denied (reason: %.8x)", vmxcontext.ExitReason);
+ 
+     // VmxUpdateGuestContext();
+@@ -1167,7 +1731,7 @@ void VmxHvmInternalHandleExit(void)
+     /* Unreachable */
+     break;
+ 
+-  case EXIT_REASON_VMLAUNCH:
++    case EXIT_REASON_VMLAUNCH:
+     HandleVMLAUNCH();
+     
+     // VmxUpdateGuestContext();
+@@ -1179,7 +1743,7 @@ void VmxHvmInternalHandleExit(void)
+     //////////////
+     //  VMCALL  //
+     //////////////
+-  case EXIT_REASON_VMCALL:
++    case EXIT_REASON_VMCALL:
+     HandleVMCALL();
+ 
+     // VmxUpdateGuestContext();
+@@ -1191,12 +1755,12 @@ void VmxHvmInternalHandleExit(void)
+     ////////////
+     //  INVD  //
+     ////////////
+-  case EXIT_REASON_INVD:
++    case EXIT_REASON_INVD:
+     Log("INVD detected");
+ 
+     __asm__ __volatile__ (
+-			  "invd\n"
+-			  );
++     "invd\n"
++     );
+ 
+     // VmxUpdateGuestContext();
+     goto Resume;
+@@ -1207,16 +1771,16 @@ void VmxHvmInternalHandleExit(void)
+     /////////////
+     //  RDMSR  //
+     /////////////
+-  case EXIT_REASON_MSR_READ:
++    case EXIT_REASON_MSR_READ:
+     Log("Read MSR #%.8x", context.GuestContext.rcx);
+ 
+     // VmxUpdateGuestContext();
+ 
+     __asm__ __volatile__ (
+-			  "movl	%0,%%ecx\n"
+-			  "rdmsr\n"
+-			  ::"m"(context.GuestContext.rcx)
+-			  );
++     "movl	%0,%%ecx\n"
++     "rdmsr\n"
++     ::"m"(context.GuestContext.rcx)
++     );
+     goto Resume;
+     /* Unreachable */
+     break;
+@@ -1224,7 +1788,7 @@ void VmxHvmInternalHandleExit(void)
+     /////////////
+     //  WRMSR  //
+     /////////////
+-  case EXIT_REASON_MSR_WRITE:
++    case EXIT_REASON_MSR_WRITE:
+     Log("Write MSR #%.8x", context.GuestContext.rcx);
+ 
+     WriteMSR(context.GuestContext.rcx, context.GuestContext.rdx, context.GuestContext.rax);
+@@ -1237,7 +1801,7 @@ void VmxHvmInternalHandleExit(void)
+     /////////////
+     //  CPUID  //
+     /////////////
+-  case EXIT_REASON_CPUID:
++    case EXIT_REASON_CPUID:
+     if(HandlerLogging) {
+       Log("CPUID detected (RAX: %.8x)", context.GuestContext.rax);
+     }
+@@ -1246,22 +1810,22 @@ void VmxHvmInternalHandleExit(void)
+ 
+     /* XXX Do we really need this check? */
+     if(context.GuestContext.rax == 0x00000000) {
+-      
++
+       __asm__ __volatile__(
+-			   "movl		$0x00000000,%eax\n"
+-			   "cpuid\n"
+-			   "movl		$0x61656c43,%ebx\n"
+-			   "movl		$0x2e636e6c,%ecx\n"
+-			   "movl		$0x74614872,%edx\n"
+-			   );
++        "movl		$0x00000000,%eax\n"
++        "cpuid\n"
++        "movl		$0x61656c43,%ebx\n"
++        "movl		$0x2e636e6c,%ecx\n"
++        "movl		$0x74614872,%edx\n"
++        );
+       goto Resume;
+     }
+ 
+     __asm__ __volatile__(
+-    			 "movl	%0,%%eax\n"
+-    			 "cpuid\n"
+-    			 ::"m"(context.GuestContext.rax)
+-    			 );
++      "movl	%0,%%eax\n"
++      "cpuid\n"
++      ::"m"(context.GuestContext.rax)
++      );
+     goto Resume;
+     /* Unreachable */
+     break;
+@@ -1269,7 +1833,7 @@ void VmxHvmInternalHandleExit(void)
+     ///////////////////////////////
+     //  Control Register Access  //
+     ///////////////////////////////
+-  case EXIT_REASON_CR_ACCESS:
++    case EXIT_REASON_CR_ACCESS:
+ 
+     VmxInternalHandleCR();
+ 
+@@ -1283,7 +1847,7 @@ void VmxHvmInternalHandleExit(void)
+     ///////////////////////
+     //  I/O instruction  //
+     ///////////////////////
+-  case EXIT_REASON_IO_INSTRUCTION:
++    case EXIT_REASON_IO_INSTRUCTION:
+     VmxInternalHandleIO();
+     
+     // VmxUpdateGuestContext();
+@@ -1292,7 +1856,7 @@ void VmxHvmInternalHandleExit(void)
+     /* Unreachable */
+     break;
+ 
+-  case EXIT_REASON_EXCEPTION_NMI:
++    case EXIT_REASON_EXCEPTION_NMI:
+     VmxInternalHandleNMI();
+ 
+     // VmxUpdateGuestContext();
+@@ -1301,7 +1865,7 @@ void VmxHvmInternalHandleExit(void)
+     /* Unreachable */
+     break;
+ 
+-  case EXIT_REASON_HLT:
++    case EXIT_REASON_HLT:
+     HandleHLT();
+ 
+     // FIXME: Cannot execute HLT with interrupt disabled
+@@ -1313,7 +1877,7 @@ void VmxHvmInternalHandleExit(void)
+     /* Unreachable */
+     break;
+     
+-  default:
++    default:
+     /* Unknown exit condition */
+     break;
+   }
+@@ -1322,7 +1886,7 @@ void VmxHvmInternalHandleExit(void)
+   // triggered this VM exit. In this case, we simply switch off VMX mode.
+   HypercallSwitchOff(NULL);
+   
+- Resume:
++  Resume:
+   
+   return;
+   // Exit reason handled. Need to execute the VMRESUME without having
+diff --git core/vmx.h core/vmx.h
+index f840b66..1b486f9 100644
+--- core/vmx.h
++++ core/vmx.h
+@@ -239,6 +239,8 @@ enum {
+   GUEST_PENDING_DBG_EXCEPTIONS = 0x00006822,
+   GUEST_SYSENTER_ESP = 0x00006824,
+   GUEST_SYSENTER_EIP = 0x00006826,
++  GUEST_IA32_EFER_FULL = 0x00002806,
++  GUEST_IA32_EFER_HIGH = 0x00002807,
+   HOST_CR0 = 0x00006c00,
+   HOST_CR3 = 0x00006c02,
+   HOST_CR4 = 0x00006c04,
+@@ -251,6 +253,8 @@ enum {
+   HOST_IA32_SYSENTER_EIP = 0x00006c12,
+   HOST_RSP = 0x00006c14,
+   HOST_RIP = 0x00006c16,
++  HOST_IA32_EFER_FULL =  0x00002C02,
++  HOST_IA32_EFER_HIGH = 0x00002C03,
+ };
+ 
+ #endif /* _PILL_VMX_H */
