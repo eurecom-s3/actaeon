@@ -942,34 +942,21 @@ class Hyperls(commands.Command):
                                                             debug.debug("Added 4KB VMCS 0x%x with physical 0x%x to GUEST 0x%x" % (vmcs, pte_addr, physical_pages[pte_addr]))
         return guests
 
-    def useAPICtoCountGuests(self, vmcs_list, outfd):
+    def useAPICtoCountGuests(self, vmcs_list):
         guests = {}
         for vmcs in vmcs_list:
             apic_addr = self.get_vmcs_field(vmcs, vmcs_offset["APIC_ACCESS_ADDR"] * 4, layouts.vmcs.vmcs_field_size["APIC_ACCESS_ADDR"] / 8)
             if apic_addr == 0x00:
                 continue
-            outfd.write("APIC_Addr: 0x%x\n" % apic_addr)
-
             if apic_addr in guests:
                 guests[apic_addr].append(vmcs)
             else:
                 guests[apic_addr] = [vmcs]
-        if len(guests) == 0:
-            outfd.write(" [FAIL]\n")
-            return guests
-        outfd.write("\t|_ Guests #: %d " % len(guests))
-        i = 1
-        for guest, vmcs_list in guests.items():                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
-            outfd.write("\t\t|_ Guest %d has used %d core:" % (i, len(vmcs_list)))
-            i += 1
-            for vmcs in vmcs_list:
-                outfd.write("\t\t|_ VMCS address: {0:#0{1}x}".format(vmcs, 18))
         return guests
 
 
     def countGuests(self, outfd):
         global vmcs_offset, memory
-        
         outfd.write("\n:: Counting Guests in dump...\n")
         outfd.write(">> Via EPT ")
         if "EPT_POINTER" in vmcs_offset:
@@ -981,7 +968,7 @@ class Hyperls(commands.Command):
         else:
             outfd.write(" [FAIL]\n")
             outfd.write(">> Via APIC ")
-            guests = self.useAPICtoCountGuests(hyper.vmcs_found, outfd)
+            guests = self.useAPICtoCountGuests(hyper.vmcs_found)
             if len(guests.keys()) != 0:
                 outfd.write(" [OK]\n")
         i = 1
