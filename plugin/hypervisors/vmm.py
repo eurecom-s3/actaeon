@@ -183,7 +183,7 @@ class NestedRevisionIdCheck(scan.ScannerCheck):
                         prev_layout = vmcs_offset
                         prev_saved = 1
                     vmcs_offset = nh
-#                    debug.debug("Nested VMCS - [%s]" % layouts.db.nested_revision_id_db[rev_id])
+#                    debug.info("Nested VMCS - [%s]" % layouts.db.nested_revision_id_db[rev_id])
             if vmcs_offset != None:
                 return True
         return False
@@ -597,7 +597,7 @@ class Hyperls(commands.Command):
                 debug.error("CR3 size not possible.")
 
             if ((guest_cr3 % 4096) == 0) and (guest_cr3 != 0):
-                debug.debug("\t|__ VMCS 0x%08x [CONSISTENT]" % addr)
+                debug.info("\t|__ VMCS 0x%08x [CONSISTENT]" % addr)
 
 
     def find_prevalent_microarch(self, generic_vmcs, phy_space):
@@ -614,11 +614,11 @@ class Hyperls(commands.Command):
                     if key not in microarch_vmcs:
                         microarch_vmcs[key] = []
                         microarch_vmcs[key].append(vmcs)
-                        debug.info("Possible VMCS 0x%08x with %s microarchitecture" % (vmcs,
+                        debug.info("Possible VMCS 0x%x with %s microarchitecture" % (vmcs,
                         layouts.db.revision_id_db[key]))
                         self.check_microarch(vmcs, phy_space, key)
                     else:
-                        debug.info("Possible VMCS 0x%08x with %s microarchitecture" % (vmcs,
+                        debug.info("Possible VMCS 0x%x with %s microarchitecture" % (vmcs,
                         layouts.db.revision_id_db[key]))
                         microarch_vmcs[key].append(vmcs)
                         self.check_microarch(vmcs, phy_space, key)
@@ -666,33 +666,33 @@ class Hyperls(commands.Command):
         debug.debug("Debug Mode")
         if self._config.GENERIC == False:
             for offset in VmcsScan().scan(phy_space):
-                debug.debug(">> Possible VMCS at 0x%16x" % offset)
+                debug.info(">> Possible VMCS at 0x%x" % offset)
                 if not self.isPAE(offset, phy_space, True):
                     # 32 bit paging 
                     if self.page_dir_validation32(offset, phy_space):
-                        debug.debug("[32 bit] VMCS 0x%08x has been validated" % offset)
+                        debug.info("[32 bit] VMCS 0x%x has been validated" % offset)
                         hyper.vmcs_found.append(offset)
                         yield offset
                     else:
-                        debug.debug("[32 bit] VMCS 0x%08x has not been validated" % offset)
+                        debug.info("[32 bit] VMCS 0x%x has not been validated" % offset)
                 elif not self.isIA32E(offset, phy_space, True):
                     # 32 bit PAE paging
                     if self.page_dir_validation32PAE(offset, phy_space):
-                        debug.debug("[32 bit PAE] VMCS 0x%16x has been validated" % offset)
+                        debug.info("[32 bit PAE] VMCS 0x%x has been validated" % offset)
                         hyper.vmcs_found.append(offset)
                         yield offset
                     else:
-                        debug.debug("[32 bit PAE] VMCS 0x%16x has not been validate" % offset)
+                        debug.info("[32 bit PAE] VMCS 0x%x has not been validate" % offset)
                 elif self.isIA32E(offset, phy_space, True) and self.isPAE(offset, phy_space, True):
                     # IA32E paging
                     if self.page_dir_validation64(offset, phy_space):
-                        debug.debug("[64 bit] VMCS 0x%16x has been validated" % offset)
+                        debug.info("[64 bit] VMCS 0x%x has been validated" % offset)
                         hyper.vmcs_found.append(offset)
                         yield offset
                     else:
-                        debug.debug("[64 bit] VMCS 0x%16x has not been validated" % offset)
+                        debug.info("[64 bit] VMCS 0x%x has not been validated" % offset)
                 else:
-                    debug.debug("Not possible to validate the VMCS. Impossible to detect paging")
+                    debug.info("Not possible to validate the VMCS. Impossible to detect paging")
 
             if self._config.NESTED:
                 priv_cr3_list = []
@@ -707,7 +707,7 @@ class Hyperls(commands.Command):
                 val = 0
                 for offset in NestedScan().scan(phy_space):
                     rev_id = self.get_vmcs_field(offset, 0, 4)
-                    debug.debug("Possible Nested VMCS at 0x%08x - [%s]" % (offset, layouts.db.nested_revision_id_db[rev_id]))
+                    debug.info("Possible Nested VMCS at 0x%08x - [%s]" % (offset, layouts.db.nested_revision_id_db[rev_id]))
                     nvalidated = 1
                     for hpd in priv_cr3_list:
                         if self.page_dir_validation32(offset, phy_space, hpd):
@@ -729,7 +729,7 @@ class Hyperls(commands.Command):
             for offset in GenericVmcsScan().scan(phy_space):
                 if self.find_microarch(phy_space, offset):
                     if self._config.VERBOSE:
-                        debug.debug("Candidate VMCS at 0x%08x" % offset)
+                        debug.info("Candidate VMCS at 0x%08x" % offset)
                     generic_vmcs.append(offset)
 
             self.find_prevalent_microarch(generic_vmcs,phy_space)
@@ -860,15 +860,16 @@ class Hyperls(commands.Command):
         guests = {}
         physical_pages = {}
 
-        debug.info("Walking EPT")
         for vmcs in vmcs_list:
-            eptp = self.get_vmcs_field(vmcs, vmcs_offset["EPT_POINTER"]*4, layouts.vmcs.vmcs_field_size["EPT_POINTER"]/8)
-#            debug.info("VMCS: 0x%x EPT: 0x%x physical_pages len = %d len VMCS list %d" % (vmcs, eptp, len(physical_pages), len(vmcs_list)))
+            eptp = self.get_vmcs_field(vmcs, vmcs_offset["EPT_POINTER"] * 4, layouts.vmcs.vmcs_field_size["EPT_POINTER"] / 8)
+            debug.debug("VMCS: 0x%x EPT: 0x%x physical_pages len = %d len VMCS list %d" % (vmcs, eptp, len(physical_pages), len(vmcs_list)))
             mask_eptp = 0x000FFFFFFFFFF000
             mask_1GB = 0x000FFFFFC0000000
             mask_2MB = 0x000FFFFFFFE00000
             mask_4KB = 0x000FFFFFFFFFF000
             eptp = eptp & mask_eptp  # Alignment to 4KB
+            if not memory.is_valid_address(eptp):
+                continue
             found = False
             #PML4
             for pml4_entry in range(0, 4096, 8):
@@ -892,12 +893,12 @@ class Hyperls(commands.Command):
                                     if not vmcs in guests[physical_pages[pde_addr]]:
                                         guests[physical_pages[pdpte_addr]].append(vmcs)
                                         found = True
-#                                        debug.info("Match 1GB VMCS 0x%x with physical 0x%x to GUEST 0x%x" % (vmcs, pdpte_addr, physical_pages[pdpte_addr]))
+                                        debug.debug("Match 1GB VMCS 0x%x with physical 0x%x to GUEST 0x%x" % (vmcs, pdpte_addr, physical_pages[pdpte_addr]))
                                 else:
                                     physical_pages[pdpte_addr] = vmcs
                                     if not vmcs in guests:
                                         guests[vmcs] = [vmcs]
-#                                    debug.info("Added 1GB VMCS 0x%x with physical 0x%x to GUEST 0x%x" % (vmcs, pdpte_addr, physical_pages[pdpte_addr]))
+                                    debug.debug("Added 1GB VMCS 0x%x with physical 0x%x to GUEST 0x%x" % (vmcs, pdpte_addr, physical_pages[pdpte_addr]))
                             elif not found:
                                 #PD
                                 for pd_entry in range(0, 4096, 8):
@@ -913,13 +914,12 @@ class Hyperls(commands.Command):
                                                 if not vmcs in guests[physical_pages[pde_addr]]:
                                                     guests[physical_pages[pde_addr]].append(vmcs)
                                                     found = True
-#                                                    debug.info("Match 2MB VMCS 0x%x with physical 0x%x to GUEST 0x%x" % (vmcs, pde_addr, physical_pages[pde_addr]))
-
+                                                    debug.debug("Match 2MB VMCS 0x%x with physical 0x%x to GUEST 0x%x" % (vmcs, pde_addr, physical_pages[pde_addr]))
                                             else:
                                                 physical_pages[pde_addr] = vmcs
                                                 if not vmcs in guests:
                                                     guests[vmcs] = [vmcs]
-#                                                debug.info("Added 2MB VMCS 0x%x with physical 0x%x to GUEST 0x%x" % (vmcs, pde_addr, physical_pages[pde_addr]))
+                                                debug.debug("Added 2MB VMCS 0x%x with physical 0x%x to GUEST 0x%x" % (vmcs, pde_addr, physical_pages[pde_addr]))
                                         elif not found:
                                             #PT
                                             for pt_entry in range(0, 4096, 8):
@@ -933,13 +933,13 @@ class Hyperls(commands.Command):
                                                             if not vmcs in guests[physical_pages[pte_addr]]:
                                                                 guests[physical_pages[pte_addr]].append(vmcs)
                                                                 found = True
-#                                                                debug.info("Match 4KB VMCS 0x%x with physical 0x%x to GUEST 0x%x" % (vmcs, pte_addr, physical_pages[pte_addr]))
+                                                                debug.debug("Match 4KB VMCS 0x%x with physical 0x%x to GUEST 0x%x" % (vmcs, pte_addr, physical_pages[pte_addr]))
 
                                                         else:
                                                             physical_pages[pte_addr] = vmcs
                                                             if not vmcs in guests:
                                                                 guests[vmcs] = [vmcs]
-#                                                            debug.info("Added 4KB VMCS 0x%x with physical 0x%x to GUEST 0x%x" % (vmcs, pte_addr, physical_pages[pte_addr]))
+                                                            debug.debug("Added 4KB VMCS 0x%x with physical 0x%x to GUEST 0x%x" % (vmcs, pte_addr, physical_pages[pte_addr]))
         return guests
 
     def guestPhAddrToPhAddr(self, eptp, address):
@@ -988,44 +988,59 @@ class Hyperls(commands.Command):
         return entry_addr
 
 
-    def useAPICtoCountGuests(self, vmcs_list):
+    def useAPICtoCountGuests(self, vmcs_list, outfd):
         guests = {}
         for vmcs in vmcs_list:
-            apic_addr = self.get_vmcs_field(vmcs, vmcs_offset["APIC_ACCESS_ADDR"]*4, layouts.vmcs.vmcs_field_size["APIC_ACCESS_ADDR"]/8)
-            debug.info("apic_addr 0x%x" % apic_addr)
+            apic_addr = self.get_vmcs_field(vmcs, vmcs_offset["APIC_ACCESS_ADDR"] * 4, layouts.vmcs.vmcs_field_size["APIC_ACCESS_ADDR"] / 8)
+            if apic_addr == 0x00:
+                continue
+            outfd.write("APIC_Addr: 0x%x\n" % apic_addr)
 
             if apic_addr in guests:
                 guests[apic_addr].append(vmcs)
             else:
                 guests[apic_addr] = [vmcs]
-        outfd.write("\t| There are %d guests: \n" % len(guests))
+        if len(guests) == 0:
+            outfd.write(" [FAIL]\n")
+            return guests
+        outfd.write("\t|_ Guests #: %d " % len(guests))
         i = 1
         for guest, vmcs_list in guests.items():                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
-            outfd.write("\t\t| Guest %d has used %d core:\n" % (i, len(vmcs_list)))
+            outfd.write("\t\t|_ Guest %d has used %d core:" % (i, len(vmcs_list)))
             i += 1
             for vmcs in vmcs_list:
-                outfd.write("\t\t\t| VMCS address: {0:#0{1}x}\n".format(vmcs, 18))
-
+                outfd.write("\t\t|_ VMCS address: {0:#0{1}x}".format(vmcs, 18))
         return guests
 
 
     def countGuests(self, outfd):
         global vmcs_offset, memory
-        outfd.write("\n:: Counting guests in dump...\n")
+        
+        outfd.write("\n:: Counting Guests in dump...\n")
+        outfd.write(">> Via EPT ")
         if "EPT_POINTER" in vmcs_offset:
             guests = self.walkEPTtoCountGuests(hyper.vmcs_found)
+            if len(guests.keys()) != 0:
+                outfd.write(" [OK]\n")
+            else:
+                outfd.write(" [FAIL]\n")
         else:
-            outfd.write("Not EPT support. Using APIC to count guests\n")
-            guests = self.useAPICtoCountGuests(hyper.vmcs_found)
+            outfd.write(" [FAIL]\n")
+            outfd.write(">> Via APIC ")
+            guests = self.useAPICtoCountGuests(hyper.vmcs_found, outfd)
+            if len(guests.keys()) != 0:
+                outfd.write(" [OK]\n")
         i = 1
         for guest, vmcs_list in guests.items():
             if guest == 0x00 and not "EPT_POINTER" in vmcs_offset:
-                outfd.write("\t\tSome Guests did not use APIC. Not possible to count guests for:\n")
+                outfd.write("\t\t>> Not possible to count Guests\n")
+                continue
             else:
                 outfd.write("\t\t|_ Guest %d used %d core:\n" % (i, len(vmcs_list)))
                 i += 1
             for vmcs in vmcs_list:
-                outfd.write("\t\t\t|_ VMCS address: {0:#0{1}x}\n".format(vmcs, 18))
+                outfd.write("\t\t - VMCS address: {0:#0{1}x}\n".format(vmcs, 18))
+
 
     def count_hypervisors(self, outfd):
         global vmcs12
@@ -1047,7 +1062,7 @@ class Hyperls(commands.Command):
             else:
                 rip[ip] += 1
         list_rip = rip.keys()
-        outfd.write("\t| There are %d hypervisors: " % len(list_rip))
+        outfd.write("\t|_ There are %d hypervisors: " % len(list_rip))
         for i in list_rip:
             outfd.write(" 0x%08x " % i)
         outfd.write("\n")
