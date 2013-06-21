@@ -942,52 +942,6 @@ class Hyperls(commands.Command):
                                                             debug.debug("Added 4KB VMCS 0x%x with physical 0x%x to GUEST 0x%x" % (vmcs, pte_addr, physical_pages[pte_addr]))
         return guests
 
-    def guestPhAddrToPhAddr(self, eptp, address):
-        global memory
-
-        mask_eptp = 0x000FFFFFFFFFF000
-        mask_1GB = 0x000FFFFFC0000000
-        mask_2MB = 0x000FFFFFFFE00000
-        mask_4KB = 0x000FFFFFFFFFF000
-        mask_pml4e = 0x0000FF8000000000
-        mask_pdpte = 0x0000007FC0000000
-        mask_pde = 0x000000003FE00000
-        mask_pte = 0x0000000001FF000
-
-        debug.info("EPTP = 0x%x address 0x%x" % (eptp, address))
-        pml4e_addr = (eptp & mask_eptp) + (address & mask_pml4e)
-        pml4e_raw = memory.read(pml4e_addr, 0x08)
-        pml4e = struct.unpack("<Q", pml4e_raw)[0]
-        debug.info("pml4e_addr = 0x%x PML4E = 0x%x" % (pml4e_addr, pml4e))
-        pdpte_addr = (pml4e & mask_4KB) + (address & mask_pdpte)
-        pdpte_raw = memory.read(pdpte_addr, 0x08)
-        pdpte = struct.unpack("<Q", pdpte_raw)[0]
-        debug.info("pdpte_addr = 0x%x pdpte = 0x%x" % (pdpte_addr, pdpte))
-        if (self.isExtendedPaging(pdpte)):
-            #1GB page
-            entry_addr = (pdpte & mask_1GB) + (address & 0x03FFFFFFF)
-            debug.info("1GB page entry_addr = 0x%x" % entry_addr)
-        else:
-            #EPT-PDE
-            pde_addr = (pdpte & mask_4KB) + (address & mask_pde)
-            pde_raw = memory.read(pde_addr, 0x08)
-            pde = struct.unpack("<Q", pde_raw)[0]
-            debug.info("pde_addr = 0x%x pde = 0x%x" % (pde_addr, pde))
-            if (self.isExtendedPaging(pde)):
-                #2MB page
-                entry_addr = (pde & mask_2MB) + (address & 0x01FFFFF)
-                debug.info("2MB page entry_addr = 0x%x" %entry_addr)
-            else:
-                #EPT-PTE
-                pte_addr = (pde & mask_4KB) + (address & mask_pte)
-                pte_raw = memory.read(pte_addr, 0x08)
-                pte = struct.unpack("<Q", pte_raw)[0]
-                debug.info("pte_addr = 0x%x pte = 0x%x" % (pte_addr, pte))
-                entry_addr = (pte & mask_4KB) + (address & 0x0FFF)
-                debug.info("4KB page entry_addr = 0x%x" %entry_addr)
-        return entry_addr
-
-
     def useAPICtoCountGuests(self, vmcs_list, outfd):
         guests = {}
         for vmcs in vmcs_list:
