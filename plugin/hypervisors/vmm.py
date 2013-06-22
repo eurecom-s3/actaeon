@@ -871,6 +871,7 @@ class Hyperls(commands.Command):
             if not memory.is_valid_address(eptp):
                 continue
             found = False
+            newGuest = False
             #PML4
             for pml4_entry in range(0, 4096, 8):
                 if found:
@@ -889,12 +890,13 @@ class Hyperls(commands.Command):
                         if self.eptPageAccessAllowed(pdpte) and memory.is_valid_address(pdpte_addr):
                             if self.isExtendedPaging(pdpte):
                                 pdpte_addr = pdpte_addr & mask_1GB
-                                if pdpte_addr in physical_pages:
+                                if pdpte_addr in physical_pages and not newGuest:
                                     if not vmcs in guests[physical_pages[pde_addr]]:
                                         guests[physical_pages[pdpte_addr]].append(vmcs)
                                         found = True
                                         debug.debug("Match 1GB VMCS 0x%x with physical 0x%x to GUEST 0x%x" % (vmcs, pdpte_addr, physical_pages[pdpte_addr]))
                                 else:
+                                    newGuest = True
                                     physical_pages[pdpte_addr] = vmcs
                                     if not vmcs in guests:
                                         guests[vmcs] = [vmcs]
@@ -910,12 +912,13 @@ class Hyperls(commands.Command):
                                     if self.eptPageAccessAllowed(pde) and memory.is_valid_address(pde_addr):
                                         if self.isExtendedPaging(pde):
                                             pde_addr = pde & mask_2MB
-                                            if pde_addr in physical_pages:
+                                            if pde_addr in physical_pages and not newGuest:
                                                 if not vmcs in guests[physical_pages[pde_addr]]:
                                                     guests[physical_pages[pde_addr]].append(vmcs)
                                                     found = True
                                                     debug.debug("Match 2MB VMCS 0x%x with physical 0x%x to GUEST 0x%x" % (vmcs, pde_addr, physical_pages[pde_addr]))
                                             else:
+                                                newGuest = True
                                                 physical_pages[pde_addr] = vmcs
                                                 if not vmcs in guests:
                                                     guests[vmcs] = [vmcs]
@@ -929,13 +932,14 @@ class Hyperls(commands.Command):
                                                     pte = struct.unpack("<Q", pte_raw)[0]
                                                     pte_addr = pte & mask_4KB
                                                     if self.eptPageAccessAllowed(pte) and memory.is_valid_address(pte_addr):
-                                                        if pte_addr in physical_pages:
+                                                        if pte_addr in physical_pages and not newGuest:
                                                             if not vmcs in guests[physical_pages[pte_addr]]:
                                                                 guests[physical_pages[pte_addr]].append(vmcs)
                                                                 found = True
                                                                 debug.debug("Match 4KB VMCS 0x%x with physical 0x%x to GUEST 0x%x" % (vmcs, pte_addr, physical_pages[pte_addr]))
 
                                                         else:
+                                                            newGuest = True
                                                             physical_pages[pte_addr] = vmcs
                                                             if not vmcs in guests:
                                                                 guests[vmcs] = [vmcs]
