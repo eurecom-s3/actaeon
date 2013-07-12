@@ -15,12 +15,14 @@ import volatility.conf as conf
 
 vmcs_offset = None
 prev_layout = None
-nvalidated = prev_saved = 0
+nvalidated = 0
+prev_saved = 0
 hypervisor_pages = {}
 generic_vmcs_cr3 = {}
 memory = None
 vmcs12 = None
 revision_id = None
+
 
 class RevisionIdCheck(scan.ScannerCheck):
     """
@@ -116,6 +118,27 @@ class VMXEnableCheck(scan.ScannerCheck):
 
 
 
+class NestedHostCr3(scan.ScannerCheck):
+    """
+    HostCr3Check - Alignment Check.
+    """
+    def __init__(self, address_space, **kwargs):
+        scan.ScannerCheck.__init__(self, address_space)
+
+    def check(self, offset):
+        global vmcs_offset
+        off = vmcs_offset["HOST_CR3"] * 4
+        data = self.address_space.read(offset+off, 0x04)
+        cr3 = struct.unpack("<I", data)[0]
+        if (cr3 % 4096) == 0:
+            return True
+        else:
+            return False
+
+
+    def skip(self, data, offset):
+        return 4096
+
 
 
 class VmcsScan(scan.BaseScanner):
@@ -141,7 +164,7 @@ class NestedScan(scan.BaseScanner):
 
     checks = [ ("NestedRevisionIdCheck", {}),
                ("SecondEntryCheck", {}),
-               ("VMXEnableCheck", {}),
+               ("NestedHostCr3", {}),
                ("VmcsLinkPointerCheck", {})
                ]
 
@@ -155,7 +178,8 @@ class NestedRevisionIdCheck(scan.ScannerCheck):
 
     def match_nested_hypervisor(self, rev_id):
         global nvalidated
-
+        
+        
         nhyper = layouts.db.nested_revision_id_db[rev_id]
         if nhyper == "KVM":
             if nvalidated == 0:
@@ -182,8 +206,7 @@ class NestedRevisionIdCheck(scan.ScannerCheck):
                     if prev_saved == 0:
                         prev_layout = vmcs_offset
                         prev_saved = 1
-                    vmcs_offset = nh
-#                    debug.info("Nested VMCS - [%s]" % layouts.db.nested_revision_id_db[rev_id])
+                    vmcs_offset = nh                    
             if vmcs_offset != None:
                 return True
         return False
@@ -434,11 +457,12 @@ class Hyperls(commands.Command):
     '''
     Pagediralgo - 64 bits - (16 (sign extension) - 9 - 9 - 9 - 9 - 12)
     '''
-    def page_dir_validation64(self, page, phy_space):
+    def page_dir_validation64(self, page, phy_space, cr3 = None):
         global vmcs_offset
         #debug.info("Validation IA-32e")
-        cr3_raw = phy_space.read(page + (vmcs_offset["HOST_CR3"]*4), 0x08)
-        cr3 = struct.unpack('<Q', cr3_raw)[0]
+        if cr3 == None:
+            cr3_raw = phy_space.read(page + (vmcs_offset["HOST_CR3"]*4), 0x08)
+            cr3 = struct.unpack('<Q', cr3_raw)[0]
         mask_cr3 = 0x000FFFFFFFFFF000
         mask_1GB = 0x000FFFFFC0000000
         mask_2MB = 0x000FFFFFFFE00000
@@ -481,15 +505,16 @@ class Hyperls(commands.Command):
                                                     return True
         return False
 
-    def page_dir_validation32PAE(self, page, phy_space):
+    def page_dir_validation32PAE(self, page, phy_space, cr3 = None):
         global vmcs_offset
         mask_cr3 = 0xFFFFFFE0
         mask_2MB = 0x000FFFFFFFE00000
         mask_4KB = 0x000FFFFFFFFFF000
 
         #debug.info("Validation PAE paging")
-        cr3_raw = phy_space.read(page + vmcs_offset["HOST_CR3"] * 4, 4)
-        cr3 = struct.unpack("<I", cr3_raw)[0]
+        if cr3 == None:
+            cr3_raw = phy_space.read(page + vmcs_offset["HOST_CR3"] * 4, 4)
+            cr3 = struct.unpack("<I", cr3_raw)[0]
         cr3 = cr3 & mask_cr3
         #PDPTEs are 4 x 64 bit
         for entry in range(0, 32, 8):
@@ -519,7 +544,7 @@ class Hyperls(commands.Command):
                                         return True
         return False
 
-    def page_dir_validation32(self, page, phy_space):
+    def page_dir_validation32(self, page, phy_space, cr3 = None):
         '''
         Let's start validating the normal 32 translation
         '''
@@ -527,8 +552,9 @@ class Hyperls(commands.Command):
         mask_4KB = 0xFFFFF000
         mask_4MB = 0xFFC00000
         #debug.info("Validation 32 bit paging")
-        cr3_raw = phy_space.read(page + (vmcs_offset["HOST_CR3"]*4), 4)
-        cr3 = struct.unpack('<I', cr3_raw)[0]
+        if cr3 == None:
+            cr3_raw = phy_space.read(page + (vmcs_offset["HOST_CR3"]*4), 4)
+            cr3 = struct.unpack('<I', cr3_raw)[0]
 
         # PD
         for entry in range(0, 4096, 4):
@@ -705,18 +731,20 @@ class Hyperls(commands.Command):
                 TODO: Make validation more generic for nested VMCS
                 '''
                 val = 0
+                nvalidated = 0
                 for offset in NestedScan().scan(phy_space):
                     rev_id = self.get_vmcs_field(offset, 0, 4)
                     debug.info("Possible Nested VMCS at 0x%08x - [%s]" % (offset, layouts.db.nested_revision_id_db[rev_id]))
-                    nvalidated = 1
                     for hpd in priv_cr3_list:
                         if self.page_dir_validation32(offset, phy_space, hpd):
                             val = 1
                             hyper.nvmcs_found.append(offset)
                         if val == 0:
-                            if self.page_dir_validation64(offset, phy_space):
+                            if self.page_dir_validation64(offset, phy_space, hpd):
                                 val = 1
                                 hyper.nvmcs_found.append(offset)
+                        if val == 1:
+                            nvalidated = 1
                         val = 0
                     nh = self.match_nested_hypervisor(rev_id)
                     if nh != None:
