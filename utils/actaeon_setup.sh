@@ -1,12 +1,9 @@
 #!/bin/bash
 
-###############################################################################
-# Author    : Andrei Costin (andrei@andreicostin.com) (@costinandrei)
-# Date      : 14 Jun 2013
 # Project   : Actaeon is a tool to perform memory forensics of virtualization 
 #             environments.
 # Name      : Minimal installation script for Actaeon
-###############################################################################
+
 
 read -e -p "Enter Actaeon root installation dir: " -i "$PWD" ACT_ROOT_DIR
 echo "$ACT_ROOT_DIR"
@@ -29,7 +26,7 @@ patch -p0 < hdbg.diff
 cd "$ACT_ROOT_DIR"
 wget http://volatility.googlecode.com/files/volatility-2.2.zip
 unzip volatility-2.2.zip
-VOL_DIR="$ACT_ROOT_DIR/volatility-2.2"
+VOL_DIR="$ACT_ROOT_DIR/volatility-2.2/"
 cd "$VOL_DIR"
 cp "$ACT_DIR/vol_patch/intel.diff" .
 cp "$ACT_DIR/vol_patch/windows.diff" .
@@ -37,7 +34,7 @@ patch -p0 < intel.diff
 patch -p0 < windows.diff
 
 # Volatility Plugin
-cp -R "$ACT_DIR/plugin/hypervisors/" "$VOL_DIR/plugins/"
+cp -R "$ACT_DIR/plugin/hypervisors/" "$VOL_DIR/volatility/plugins/"
 
 echo "Enjoy!"
 
