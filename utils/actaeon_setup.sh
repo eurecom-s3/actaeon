@@ -36,5 +36,5 @@ patch -p0 < windows.diff
 # Volatility Plugin
 cp -R "$ACT_DIR/plugin/hypervisors/" "$VOL_DIR/volatility/plugins/"
 
-echo "Enjoy!"
+echo "Happy hacking!"
 
