@@ -1,9 +1,12 @@
 #!/bin/bash
 
+#
+# Author    : Andrei Costin
 # Project   : Actaeon is a tool to perform memory forensics of virtualization 
 #             environments.
 # Name      : Minimal installation script for Actaeon
-
+#
+#
 
 read -e -p "Enter Actaeon root installation dir: " -i "$PWD" ACT_ROOT_DIR
 echo "$ACT_ROOT_DIR"
